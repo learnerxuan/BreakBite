@@ -1,0 +1,13 @@
+.git
+node_modules
+dist
+dist-tests
+.data
+.env
+.env.*
+*.patch
+*.zip
+*.log
+docs
+tests
+infra/*.local.yaml

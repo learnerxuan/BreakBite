@@ -1,0 +1,8 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All application access goes through the authorised API.
+    // Server REST access uses IAM and is NOT constrained by these client rules.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

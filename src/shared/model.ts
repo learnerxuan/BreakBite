@@ -1,0 +1,167 @@
+export type Role = 'student' | 'vendor' | 'agent';
+export interface Actor {
+    id: string;
+    role: Role;
+    name: string;
+    vendorId?: string;
+}
+export interface Vendor {
+    id: string;
+    name: string;
+    description: string;
+    location: string;
+    open: boolean;
+    synthetic: boolean;
+}
+export interface MenuItem {
+    id: string;
+    vendorId: string;
+    name: string;
+    description: string;
+    category: 'Rice' | 'Noodles' | 'Light bites' | 'Drinks';
+    priceSen: number;
+    stock: number;
+    prepMinutes: number;
+    prepUnits: number;
+    enabled: boolean;
+    art: 'rice' | 'noodles' | 'toast' | 'salad' | 'drink';
+    tags: string[];
+    allergens: string[] | null;
+}
+export interface Slot {
+    id: string;
+    startAt: string;
+    endAt: string;
+    kitchenCapacity: number;
+    reservedUnits: number;
+    pickupCapacity: number;
+    reservedHandovers: number;
+}
+export interface BreakPlan {
+    breakStartAt: string;
+    nextClassAt: string;
+    walkToMinutes: number;
+    eatMinutes: number;
+    returnMinutes: number;
+    bufferMinutes: number;
+    budgetSen: number;
+}
+export interface Selection {
+    itemId: string;
+    quantity: number;
+}
+export interface OrderLine extends Selection {
+    name: string;
+    unitPriceSen: number;
+    prepUnits: number;
+}
+export type OrderStatus = 'confirmed' | 'preparing' | 'ready' | 'collected' | 'cancelled';
+export interface Order {
+    id: string;
+    studentId: string;
+    vendorId: string;
+    lines: OrderLine[];
+    totalSen: number;
+    slotId: string;
+    plan: BreakPlan;
+    latestPickupAt: string;
+    earliestPickupAt: string;
+    estimatedReadyAt: string;
+    status: OrderStatus;
+    version: number;
+    pickupCode: string;
+    createdAt: string;
+    updatedAt: string;
+    collectionFailures: number;
+    collectionLockedUntil: string | null;
+    payment: 'simulated';
+}
+export interface Incident {
+    id: string;
+    itemIds: string[];
+    reason: string;
+    delayMinutes: number;
+    active: boolean;
+    createdAt: string;
+}
+export interface RecoveryOption {
+    itemId: string;
+    itemName: string;
+    quantity: number;
+    totalSen: number;
+    slotId: string;
+    readyAt: string;
+    allergens: string[] | null;
+}
+export type ProposalStatus = 'pending_vendor' | 'approved' | 'accepted' | 'declined' | 'rejected' | 'expired' | 'stale';
+export interface Proposal {
+    id: string;
+    orderId: string;
+    orderVersion: number;
+    studentId: string;
+    vendorId: string;
+    option: RecoveryOption;
+    reason: string;
+    status: ProposalStatus;
+    createdAt: string;
+    expiresAt: string;
+    source: 'manual' | 'mcp';
+}
+export interface AuditEvent {
+    id: string;
+    at: string;
+    actorId: string;
+    action: string;
+    subjectId: string;
+    detail: string;
+}
+export interface VendorState {
+    schemaVersion: 1;
+    revision: number;
+    vendor: Vendor;
+    items: MenuItem[];
+    slots: Slot[];
+    orders: Order[];
+    incidents: Incident[];
+    proposals: Proposal[];
+    audit: AuditEvent[];
+    requests: Record<string, {
+        fingerprint: string;
+        orderId: string;
+        createdAt: string;
+    }>;
+}
+export interface Quote {
+    vendorId: string;
+    totalSen: number;
+    earliestPickupAt: string;
+    latestPickupAt: string;
+    slots: Slot[];
+    reasons: string[];
+}
+export type PublicOrder = Omit<Order, 'pickupCode' | 'collectionFailures' | 'collectionLockedUntil'> & {
+    pickupCode?: string;
+};
+export interface Snapshot {
+    actor: Actor;
+    vendors: Vendor[];
+    items: MenuItem[];
+    slots: (Slot & {
+        vendorId: string;
+    })[];
+    orders: PublicOrder[];
+    proposals: Proposal[];
+    incidents: Incident[];
+    audit: AuditEvent[];
+    serverTime: string;
+    mode: 'demo' | 'firebase';
+}
+export interface AppConfig {
+    mode: 'demo' | 'firebase';
+    firebaseApiKey: string;
+    enterpriseConfigured: boolean;
+    demoIdentities: Actor[];
+}
+export const money = (sen: number): string => `RM ${(sen / 100).toFixed(2)}`;
+export const time = (iso: string): string => new Intl.DateTimeFormat('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' }).format(new Date(iso));
+export const atRisk = (o: Pick<Order, 'estimatedReadyAt' | 'latestPickupAt' | 'status'>): boolean => ['confirmed', 'preparing'].includes(o.status) && o.estimatedReadyAt > o.latestPickupAt;

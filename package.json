@@ -1,0 +1,15 @@
+{
+  "name": "breakbite", "version": "0.1.0", "private": true, "type": "module",
+  "description": "Break-aware campus ordering with capacity-safe pickup and consent-based recovery",
+  "engines": { "node": ">=22.16.0" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/assets.mjs",
+    "start": "node --env-file-if-exists=.env dist/server/index.js",
+    "dev": "npm run build && npm start",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test dist-tests/tests/*.test.js",
+    "check": "npm run typecheck && npm test && npm run build",
+    "seed:cloud": "node --env-file-if-exists=.env dist/server/seed-cloud.js"
+  },
+  "devDependencies": { "@types/node": "25.1.0", "typescript": "5.8.3" }
+}

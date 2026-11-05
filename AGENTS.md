@@ -1,13 +1,13 @@
 # Contributor and AI Coding Rules
 
-- Read `README.md`, `docs/PRODUCT.md`, and `docs/ARCHITECTURE.md` before implementation.
-- This repository starts as documentation only. Do not claim features, deployments, or tests exist until verified.
+- Read `README.md`, `docs/IMPLEMENTATION.md`, and `docs/MANUAL_SETUP.md` before implementation. Older product/architecture documents are planning records.
+- The local MVP is implemented. Cloud adapters are coded, but actual Google deployment and Gemini Enterprise registration are not yet verified. Report these separately.
 - Build the agreed MVP; propose scope changes before adding new services or optional features.
 - Keep English documentation concise and consistent with the actual code.
 
 ## Engineering
 
-- Use TypeScript for the planned frontend and backend; agree shared data contracts before parallel changes.
+- Use TypeScript for the frontend and backend; agree shared data contracts before parallel changes.
 - Keep inventory, pricing, capacity, identity, and permissions authoritative on the server.
 - Use atomic reservations, idempotency, and explicit order state transitions.
 - Agent tools may read/evaluate/create proposals; they must not bypass approval or directly rewrite arbitrary database records.

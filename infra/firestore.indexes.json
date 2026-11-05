@@ -1,0 +1,10 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "vendorStates",
+      "fieldPath": "payload",
+      "indexes": []
+    }
+  ]
+}
