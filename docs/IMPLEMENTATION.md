@@ -21,6 +21,15 @@ Gemini Enterprise (license/tenant setup pending)
   -> pending proposal -> vendor approval -> student consent -> revalidation
 ```
 
+## Product Positioning and UX Boundary
+
+- The core value is **order before arriving and collect conveniently**, not a requirement that students have insufficient break time.
+- Ordering before class ends is one use case; ordinary advance ordering is also within the product direction.
+- [PRODUCT.md](PRODUCT.md) describes a target pickup-first experience with an optional **Fit my break** helper.
+- **Current code still requires the existing break/class-time inputs and checks at checkout.** A separate path without class-time details has not been implemented.
+- The 5 November 2026 positioning update changes documentation only; it does not relax validation or add a working UX mode.
+- A future pickup-first path must retain preparation lead-time, inventory, capacity, identity and consent checks. Update the UI, API contract and tests together.
+
 ## Time and capacity
 
 - Earliest arrival: max(now, break start) + walk to counter.

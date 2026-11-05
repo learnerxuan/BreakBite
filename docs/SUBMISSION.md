@@ -62,11 +62,14 @@ These details appeared in earlier planning but could not be rechecked in the cur
 ## Suggested Project Details
 
 - **Team name:** ByteShift (proposal; confirm with the team).
-- **Project:** BreakBite — Meals That Fit Your Class Break.
+- **Project:** BreakBite — Order Ahead. Pick Up When It Suits You.
 - **Track:** Smart Campus & Student Experience.
 - **Repository:** https://github.com/learnerxuan/BreakBite
-- **Summary draft:** BreakBite helps students pre-order campus meals that fit their class breaks. It checks inventory, kitchen workload, and pickup capacity before confirming an order. A Gemini Enterprise Meal Rescue Agent helps vendors respond to unexpected delays by creating recovery proposals that require vendor approval, student consent, and backend revalidation.
-- Update the summary to match what is actually implemented at submission time.
+- **Problem:** Students using walk-up ordering can spend unnecessary time queuing to order and waiting for preparation at campus food stalls. They need convenient advance ordering and planned collection, not only assistance when breaks are short.
+- **Summary draft:** BreakBite helps students browse campus menus, order before arriving, and select capacity-checked pickup windows to reduce avoidable on-site waiting. The local MVP includes inventory checks, timing guidance, order tracking and consent-based recovery from delays. A planned Gemini Enterprise Meal Rescue integration will help vendors evaluate exceptions and create approval requests; live tenant execution is pending account setup and verification.
+- **Use-case example:** Place an order before class ends, when appropriate, and collect afterwards. This also benefits students with long breaks or no next class.
+- **Positioning:** Convenient pre-ordering is the core value. Class-time planning and Meal Rescue support that experience; they are not separate problem statements.
+- Update the summary to match what is actually implemented at submission time. Do not claim an optional no-class-time checkout path until it is built; see [PRODUCT.md](PRODUCT.md).
 
 ## Recommended Package
 
@@ -74,4 +77,4 @@ These details appeared in earlier planning but could not be rechecked in the cur
 - Concise pitch deck covering problem evidence, solution, Google architecture, agent integration, tests, and limitations.
 - Accessible demo link or recording, even if the final form makes it optional.
 - Exact submitted commit SHA; no credentials or private student data.
-- The documentation currently in this repository is a starting plan, not the completed prototype submission.
+- Source code and documentation support the submission; they do not prove that team registration or final submission has been completed.

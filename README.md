@@ -1,21 +1,39 @@
 # BreakBite
-### Good food. Right on time.
+### Order ahead. Pick up when it suits you.
 
-A working campus meal pre-ordering prototype: **fit a meal into a class break, reserve realistic capacity, and recover from delays with human approval.**
+A working campus meal pre-ordering prototype: **browse before arriving, pre-order for collection, and reduce avoidable on-site waiting.** Time-aware planning and consent-based recovery support that core experience.
 
 - Track: Smart Campus & Student Experience.
 - Team name proposed: **ByteShift**.
 - Status: **local MVP implemented and tested**. Google cloud adapters are implemented but not live-verified. Gemini Enterprise tenant registration is pending the organiser's license.
 - All vendors, menus, payments and incidents in the demo are synthetic. No real purchase, refund, campus deployment or impact statistic is claimed.
 
-## Problem and solution
+## Problem statement
 
-- Short breaks must include walking, collecting, eating and returning to class.
-- A menu alone cannot show whether a meal fits that time window.
-- Unlimited pre-orders can overload the kitchen or pickup counter.
-- BreakBite validates time, stock and two capacity limits before confirming an order.
-- Unexpected delays create reviewable recovery proposals, never silent meal replacements.
-- Campus-wide demand and vendor feasibility still need real user validation.
+Students who rely on walk-up ordering can spend unnecessary time queuing to place orders and waiting for meal preparation after reaching campus food stalls. They need a convenient way to view menus and order before arriving, then collect at a suitable time, whether or not they have a short break.
+
+- **Core problem:** Avoidable on-site ordering and preparation waits, and limited control over when to collect a meal.
+- **Main value:** More convenient campus dining through order-ahead pickup; students do not need to be short of time to benefit.
+- **Example use case:** A student orders while still in class, when appropriate, and collects after class. Ordering before class or while studying elsewhere are equally valid scenarios.
+- **Supporting challenge:** Short breaks make waiting more costly, but are not the only reason to use BreakBite.
+- These are problem hypotheses. Actual waiting points, student demand and vendor feasibility still need validation; no campus-wide prevalence or time-saving result is claimed.
+
+## Proposed solution
+
+- Browse campus menus, prices and availability before visiting a stall.
+- Pre-order and select an available pickup window so vendors receive the order in advance.
+- Validate stock, kitchen workload and pickup capacity before confirming; pre-ordering must not simply create another overloaded queue.
+- Track preparation status and collect using a one-time pickup code.
+- Use time-aware planning to help students who want to fit a meal around a class or other commitment.
+- Handle unexpected delays with reviewable alternatives, never silent meal replacements.
+- Reduce unnecessary waiting, not promise zero queues, instant preparation or guaranteed collection times.
+
+## Product positioning versus current UI
+
+- **Target experience:** Normal pre-ordering first, with an optional **Fit my break** helper for students who want time guidance.
+- **Current implementation:** The checkout still uses break/class-time inputs and timing checks. A separate pickup-first path without those inputs is a follow-up UX/code change, not an implemented feature of this documentation update.
+- Stock, preparation lead time, capacity, permissions and consent checks remain necessary in every ordering path.
+- [Product direction, use cases and planned UX](docs/PRODUCT.md).
 
 ## Run locally
 
@@ -80,6 +98,7 @@ tests/           Domain, HTTP, auth, Firestore-adapter and browser checks
 
 ## Start here
 
+- [Product direction and problem statement](docs/PRODUCT.md)
 - [Actual implementation and design decisions](docs/IMPLEMENTATION.md)
 - [Manual Google setup and deployment](docs/MANUAL_SETUP.md)
 - [Gemini Enterprise connector and agent prompt](docs/AGENT_SETUP.md)
@@ -87,7 +106,7 @@ tests/           Domain, HTTP, auth, Firestore-adapter and browser checks
 - [Five-person review checklist](docs/REVIEW_CHECKLIST.md)
 - [Local demo walkthrough](docs/DEMO.md)
 
-Earlier `PRODUCT`, `ARCHITECTURE`, `TEAM`, `DELIVERY` and `SUBMISSION` documents in the GitHub repository remain planning records. This README and `IMPLEMENTATION.md` describe the code actually delivered.
+`PRODUCT.md` defines the current product direction and labels planned UX separately. Earlier `ARCHITECTURE`, `TEAM` and `DELIVERY` documents remain planning records; `SUBMISSION.md` records submission guidance and its verification limits. This README and `IMPLEMENTATION.md` describe the code actually delivered.
 
 ## Boundaries before a real pilot
 
