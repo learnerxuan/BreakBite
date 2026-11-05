@@ -1,4 +1,6 @@
-# Meal Rescue Agent
+# Meal Rescue Agent — deferred integration
+
+> Version 0.2 uses real local accounts and a single JSON database. Gemini Enterprise is deliberately not required to run it. The Google authentication/configuration notes below describe retained v0.1 adapters, not a verified v0.2 deployment. Reconcile the local database, multi-kitchen checkout and payment model before reconnecting them. Do not point an old demo/cloud store at the live v0.2 JSON file.
 
 ## Status
 

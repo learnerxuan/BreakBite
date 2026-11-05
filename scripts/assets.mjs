@@ -2,6 +2,7 @@ import { cp, mkdir } from 'node:fs/promises';
 await mkdir('dist/web', { recursive: true });
 await cp('public', 'dist/public', { recursive: true });
 await cp('src/web/styles.css', 'dist/web/styles.css');
+await cp('src/web/product.css', 'dist/web/product.css');
 // Hosting can publish this directory without leaking server modules or credentials.
 await cp('dist/web', 'dist/public/web', { recursive: true, filter: source => !source.endsWith('.map') });
 await cp('dist/shared', 'dist/public/shared', { recursive: true, filter: source => !source.endsWith('.map') });

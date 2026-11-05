@@ -34,7 +34,7 @@ export function seedVendor(id: string, now = Date.now()): VendorState {
     const start = Math.ceil((now + 10 * 60000) / 300000) * 300000;
     return {
         schemaVersion: 1, revision: 0,
-        vendor: { id, name: bowl ? 'Bowl Lab' : 'Noodle & Co.', description: bowl ? 'Good bowls. Better breaks.' : 'A little comfort between classes.', location: bowl ? 'Demo food court · Counter A' : 'Demo food court · Counter B', open: true, synthetic: true },
+        vendor: { id, name: bowl ? 'Bowl Lab' : 'Noodle & Co.', description: bowl ? 'Good bowls. Better breaks.' : 'A little comfort between classes.', location: bowl ? 'Food court · Counter A' : 'Food court · Counter B', open: true, synthetic: true },
         items: rows.map(([itemId, name, description, category, priceSen, prepMinutes, prepUnits, art, tags]) => ({ id: itemId, vendorId: id, name, description, category, priceSen, prepMinutes, prepUnits, art, tags, stock: 20, enabled: true, allergens: null })),
         slots: Array.from({ length: 36 }, (_, i) => ({ id: `${id}-${start + i * 300000}`, startAt: new Date(start + i * 300000).toISOString(), endAt: new Date(start + i * 300000 + 180000).toISOString(), kitchenCapacity: 8, reservedUnits: 0, pickupCapacity: 4, reservedHandovers: 0 })),
         orders: [], incidents: [], proposals: [], audit: [], requests: {},

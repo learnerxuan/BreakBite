@@ -1,76 +1,65 @@
-# Verification report — 5 November 2026
+# Verification report — v0.2, 5 November 2026
 
-## Executed successfully
+## Executed
 
 | Check | Result |
-|---|---|
-| `npm run typecheck` | Strict TypeScript checking passed. |
-| `npm test` | **42 tests passed, 0 failed**. |
-| `npm run build` | Browser and server JS + static assets generated. |
-| Browser smoke | Desktop + 390px mobile complete journeys passed using the bridge described below. |
+| --- | --- |
+| `npm run typecheck` | Passed. |
+| `npm test` | **67 passed, 0 failed** (42 prior + 25 local-product cases). |
+| `npm run build` | Passed; browser/server assets compiled. |
+| Operator CLI | Created two scoped accounts with masked/fixture-environment password input. |
+| Product UI journey | Passed using local rendered code and the real local HTTP backend through the bridge below. |
+| Viewports | Desktop 1440px, tablet 768px, phone 390px and 360px; overflow assertions passed. |
 
-## Automated coverage
+## New automated coverage
 
-- Deadline math, both walking legs, eating time and buffer; budget and invalid input.
-- Server pricing, stock, separate kitchen/handover capacity and paused vendors.
-- Twenty requests contesting one remaining slot: exactly one order accepted.
-- Duplicate request retries and changed-payload idempotency rejection.
-- Order lifecycle, before-preparation cancellation and reservation restoration.
-- Cross-student and cross-vendor access; pickup-code privacy and reuse protection.
-- Failed-code lockout, incident impact and resolution.
-- Proposal expiry/version checks, permission checks, vendor approval and student consent.
-- Revalidation when replacement stock changes; atomic release/reservation and code rotation.
-- New pickup windows preserve existing orders and reservations; only operators can add them.
-- File persistence/rollback; Firestore REST compare-and-swap retry and seed preservation via a test double.
-- RSA signature verification, issuer/audience/time validation, malformed/tampered/unsigned-token rejection.
-- Explicit private-Cloud-Run trust-mode configuration and mapped caller claim checks (not a real gateway test).
-- HTTP authentication/origins/Host controls and real JSON-RPC MCP read -> evaluate -> pending proposal.
+- Default real-account mode and explicit non-loopback setup requirements.
+- Pickup-first quoting without class inputs; combined budget checks.
+- Cross-kitchen atomic checkout, two child orders and separate pickup codes.
+- Failure in kitchen two rolls back kitchen one, stock and checkout records.
+- Twenty concurrent requests contesting the last drink: one complete checkout succeeds.
+- Durable idempotency/replay after pickup time and student-scoped status lookup.
+- Changed price, changed payload and overlapping counter windows fail safely.
+- Per-kitchen cancellation leaves siblings/reservations intact.
+- Collection requires payment confirmation, a valid one-time code and the right operator.
+- JSON reopen/persistence, previous snapshot, second-writer lock and corrupt-file rejection.
+- Salted password storage, no self-assigned operator role, lockout/reset.
+- HttpOnly/SameSite cookies, CSRF, revocation, session persistence and hashed token storage.
+- Cross-site and cross-kitchen requests fail; legacy single-order bypass is disabled locally.
+- Menu creation/editing and approval/consent-based ordinary pickup recovery.
 
-## Browser checks
+## Browser interaction coverage
 
-- Desktop login, menu search/category, break filtering, checkout.
-- Vendor delay report, rule-based recovery, approval, student acceptance and new pickup code.
-- Cross-student privacy, preparation progress and one-time collection.
-- Mobile checkout/order/vendor views; no horizontal overflow at 390px.
-- No uncaught JavaScript errors during the scripted journeys.
-- The source archive includes UI screenshots; the browser script regenerates them under `docs/screenshots/`. Binary screenshots are not required to run the application.
+- Guest catalogue without the old demo-only login; no mandatory class-time inputs.
+- Student signup, food-plus-drink basket from different kitchens and staggered checkout.
+- Separate order cards/codes; operator cannot see the student's pickup secret.
+- Delay report -> rule-based alternative -> operator approval -> student consent.
+- Code rotation; preparation -> ready -> paid-at-counter collection.
+- Operator creates a menu item; mobile menu/queue/forms render without overflow.
+- A deliberately lost response after server commit is recovered with the original key; no duplicate checkout.
+- Cancelling one child does not cancel its siblings.
+- No uncaught JavaScript errors in the executed journeys.
 
-### Browser environment limitation
+## Browser environment limit
 
-The available Chromium has an administrator URL-navigation block. No policy was changed or bypassed.
+Direct Chromium navigation to localhost returned `ERR_BLOCKED_BY_ADMINISTRATOR`. No policy was changed. `tests/browser_product.py --bridge` injected compiled local UI/CSS into a blank document and relayed only this application's local `/api/` requests through a per-page Python cookie jar to the real Node server.
 
-The test injected locally compiled UI code/styles into a blank page and relayed only this application's local `/api/` calls through a Python binding to the running Node server. This verifies the DOM interactions and real backend together, but **does not verify browser network navigation, production CORS, deployed CSP, Firebase login or Cloud Run IAM**. HTTP tests separately check response headers and origin handling.
-
-Executed command:
-
-```bash
-python tests/browser_smoke.py --bridge --chromium /usr/bin/chromium --base-url http://127.0.0.1:8097
-```
-
-To repeat with ordinary browser navigation on your machine:
+This verifies UI interactions and real backend behavior, but **not actual browser cookie enforcement, production navigation/CORS/CSP/TLS, Android hardware or Safari**. HTTP tests separately assert security headers, cookies and CSRF. Run normal browser tests and actual phone checks on the team's machines before submission.
 
 ```bash
-npm install
-npm run check
-npm start
-# In another terminal, using a disposable LOCAL demo data directory:
-pip install playwright
-playwright install chromium
-python tests/browser_smoke.py --base-url http://127.0.0.1:8080
+# Disposable local DATA_DIR only; first provision the two test operators.
+python tests/browser_product.py --bridge --chromium /usr/bin/chromium --base-url http://127.0.0.1:8090
+# Normal browser mode on the team's machine:
+python tests/browser_product.py --base-url http://127.0.0.1:8080
 ```
 
-**The browser test resets Bowl Lab's local synthetic demo data. Do not point it at production or important demo history.**
+The browser test creates accounts/orders/menu entries and modifies test kitchen state. Use a clean throwaway data directory, not an operational installation. Fixture operator emails are `operator.bowl@example.test` and `operator.noodle@example.test`; set `TEST_OPERATOR_PASSWORD` for its private test credentials.
 
-## Not executed / not claimed
+## Not claimed
 
-- A fresh npm registry installation in the development container: outbound DNS was unavailable. Build tools already installed in the environment were used; versions match `package.json`.
-- Actual cloud Firebase sign-in, Firestore database writes, Cloud Run deployment, Docker image build or Firebase Hosting deployment.
-- An actual Gemini Enterprise agent run, tenant registration or organizer acceptance.
-- Real payments, third-party security audit, screen-reader audit or campus-scale load test.
-- Claimed percentage reductions in wait time: none. No measured impact study exists yet.
+- Fresh npm registry installation here (outbound DNS unavailable); installed development dependencies matched the pinned versions.
+- Docker build/deployment, public HTTPS hosting, real Firebase/Firestore or Gemini Enterprise execution.
+- Real online payments/refunds, externally verified campus menus, independent security/accessibility audit or impact statistics.
+- Multi-process file storage, campus-scale throughput or power-loss resilience under all filesystems.
 
-## Reproducibility
-
-- Node v22.16.0, TypeScript 5.8.3, Node type declarations 25.1.0.
-- No runtime npm dependencies; compiled release starts with Node alone.
-- Dependency installation, cloud permissions and real data need team validation before submission.
+Environment: Node 22.16.0; TypeScript 5.8.3; Node types 25.1.0. The application has no runtime npm dependencies.

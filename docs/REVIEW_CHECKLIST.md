@@ -1,41 +1,36 @@
-# Five-person review checklist
+# Product review checklist — v0.2
 
-The implementation is ready for review, not a substitute for your team's ownership.
+Everyone reviews and tests their own changes; no dedicated QA-only member is required.
 
-## A — Technical lead (repository owner proposed)
-- Read domain rules and shared contracts.
-- Re-run concurrent last-slot, idempotency, cancellation and stale-proposal tests.
-- Review pilot storage limits and same-vendor/no-price-increase recovery policy.
-- Decide whether to keep native TypeScript UI or migrate to React later; avoid a rewrite before validation.
+## Student experience
 
-## B — AI and cloud integration
-- Own actual Firebase/Cloud Run resources and live IAM verification.
-- Confirm Gemini license, custom connector permissions and private service identity.
-- Run the real tool-to-proposal trace; demonstrate no unapproved order mutation.
-- Record failures and tenant-specific adjustments, not just screenshots of a chat response.
+- Browse before signing in; registration creates only a student account.
+- Order food from one kitchen and a drink from another without losing the basket.
+- Ordinary pickup is the default; Fit my break is optional.
+- Each kitchen's location, window, amount due, status and code are understandable.
+- No email, role selector, paid indicator or Gemini claim is fabricated.
 
-## C — UI/UX
-- Review 1440px desktop, 390px mobile, keyboard use, contrast and error states.
-- Check the break planner is understandable without technical explanation.
-- Verify users understand estimated times, simulated payments and approval status.
-- Replace the original CSS food art only with owned/licensed assets.
+## Operator experience
 
-## D — Frontend / menu content
-- Verify menu content with a participating vendor before calling it real.
-- Review basket quantities, time inputs, sold-out displays and mobile pickup screens.
-- Check allergen/halal information comes from the vendor, never model inference.
-- Do not change shared field names without A/B agreement.
+- Provision a private account via the CLI, not public signup.
+- Edit menu descriptions, prices, stock and prep assumptions; changes do not rewrite old order prices.
+- Use the queue on a phone. Verify payment at the counter before collection.
+- Report/resolve an incident, inspect alternatives and approve a proposal.
 
-## E — QA / evidence / submission
-- Re-run `npm run check` and the normal browser smoke test on your own machine.
-- Interview students and a vendor, recording anonymised observations.
-- Keep measured results separate from synthetic scenarios.
-- Prepare the deck, real Gemini trace, live-demo link and recording backup.
-- Confirm the actual event portal requirements before submission.
+## Engineering
 
-## Release gate
+- Run `npm run check` and repeat browser journeys over normal HTTP on team hardware.
+- Test last-stock concurrency, second-kitchen rollback and lost checkout responses.
+- Check cancellation affects only its kitchen; replay does not create duplicates.
+- Check session logout/reset, CSRF, student isolation and vendor isolation.
+- Confirm recovery cannot create an impossible multi-kitchen pickup itinerary.
+- Back up JSON; stop before maintenance; do not run multiple writers.
 
-- No credentials/private data in Git; clean working tree and reviewed diff.
-- Correct demo/production separation and safe Cloud Run IAM bindings.
-- All five members understand what works, what is simulated and what remains unverified.
-- Captain submits the actual final commit and tested URLs, not just a draft.
+## Mobile and release
+
+- Test 360/390px and actual Android/iPhone browsers: keyboard, forms, cart, scrolling, dialogs, payment and codes.
+- Review keyboard focus, contrast, screen-reader labels and connection errors.
+- Use only approved menu information and licensed assets. Keep unknown dietary details unknown.
+- Never publish the JSON database, password hashes, sessions or account bootstrap credentials.
+- Configure HTTPS/secure cookies before public access. Private Wi-Fi testing is a separate explicit mode.
+- Record actual results, not assumed passes. Cloud/Gemini migration remains a later acceptance gate.

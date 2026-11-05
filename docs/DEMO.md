@@ -1,28 +1,35 @@
-# Local demo walkthrough
+# Product walkthrough — v0.2
 
-## Normal purchase
+## Prepare
 
-1. Start the server; choose **Bowl Lab operator**.
-2. For a fresh fictional demo, reset this kitchen, or add new pickup windows to keep history.
-3. Switch to **Alex student**; set a break covering a realistic upcoming pickup.
-4. Add Golden chicken rice, choose a feasible window and confirm simulated checkout.
-5. Check My orders. Only the student sees the pickup code.
-6. Switch operator; Start preparing -> Mark ready -> verify the code copied from the student.
-7. Switch student and observe Collected. A second collection is rejected.
+- Follow [LOCAL_MVP.md](LOCAL_MVP.md). Build, stop the server, provision two private operator accounts, then start it.
+- Use separate browser profiles for a student and each kitchen. There is no account impersonation selector.
+- Starter kitchens and menus are examples, not an agreement with a real campus vendor.
 
-## Delay and consent
+## Order from two kitchens
 
-- Start a new order with a tight deadline, before moving it to Preparing.
-- Operator reports 15 extra minutes for **Golden chicken rice only**.
-- Choose Evaluate rescue. This is explicitly a **rules-based preview**, not Gemini.
-- Create a proposed toast or other feasible replacement, then approve it in Meal Rescue.
-- Switch student: accept or decline. Acceptance rechecks the option and rotates the pickup code.
-- To show a failed path, sell out the replacement before student acceptance; the change should fail without losing the original order.
-- Whole-kitchen incidents may leave no feasible alternative. That is a valid outcome.
+1. Browse without an account. Add chicken rice from Bowl Lab and sparkling lemon from Noodle & Co.
+2. Register a student account, or sign in. No class timetable is required.
+3. Review the grouped basket and select a pickup window for each kitchen.
+4. Set walking time between counters. Incompatible pickup windows are rejected.
+5. Confirm once. Stock and capacity for both kitchens are reserved together or neither order is placed.
+6. My orders shows two child orders, separate codes, amounts due and independent preparation states.
+7. Each operator sees only their kitchen's order. Start preparation, then mark ready.
+8. Receive payment at the counter, check the payment confirmation box and verify that kitchen's code.
+9. The student sees collected/paid for that child only. Collect the other order separately.
 
-## What not to claim
+## Failure and recovery
 
-- Do not say real payments, actual cafeteria adoption or measured wait-time improvements exist.
-- Do not present the manual preview as a live Gemini Enterprise run.
-- Do not say the local browser test proves cloud IAM works.
-- Do not manufacture overbooking to demonstrate rescue: a legitimate order is disrupted by a later incident.
+- Before preparation, report a delay for one ordered item and check alternatives.
+- Create a proposal and approve it. The owning student must accept before anything changes.
+- Acceptance checks the replacement and the remaining pickup itinerary. Conflicts preserve the original order.
+- This helper is rule-based, not a connected Gemini Enterprise agent.
+- A student can cancel a confirmed child order without cancelling the other kitchen's order.
+- If checkout loses its response, use **Check / retry original checkout** instead of creating another basket.
+
+## Evidence to capture
+
+- Desktop and phone ordering; operators cannot see the student's pickup secrets.
+- Two codes and independent order status; one unavailable kitchen causes complete checkout rollback.
+- Restart with the same data directory and check accounts, sessions and orders persist.
+- Do not claim online payments, actual campus adoption, measured time savings or live Gemini integration.

@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import type { Settings } from './config.js';
 import { Auth } from './auth.js';
+import { Accounts } from './accounts.js';
+import { CheckoutService } from './checkout.js';
+import type { LocalDatabase } from './local-database.js';
 import { AppError, object, requireThat } from './errors.js';
 import { MealService } from './domain.js';
 import { DEMO_IDENTITIES, seedVendor } from './seed.js';
@@ -28,8 +31,11 @@ async function body(req: IncomingMessage): Promise<unknown> {
         throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.');
     }
 }
-export function createApp(config: Settings, service: MealService) {
+export function createApp(config: Settings, service: MealService, db?: LocalDatabase) {
     const auth = new Auth(config);
+    const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
+    const checkout = db ? new CheckoutService(db) : undefined;
+    const authLimits = new Map<string, { count: number; until: number }>();
     const limits = new Map<string, {
         count: number;
         until: number;
@@ -50,17 +56,21 @@ export function createApp(config: Settings, service: MealService) {
                 res.setHeader('Access-Control-Allow-Origin', origin);
                 res.setHeader('Vary', 'Origin');
             }
+            if (config.mode === 'local') {
+                requireThat(config.allowedOrigins.some(o => new URL(o).host === req.headers.host), 'HOST_DENIED', 'This host is not configured. Add its exact origin to ALLOWED_ORIGINS.', 403);
+                requireThat(req.headers['sec-fetch-site'] !== 'cross-site', 'ORIGIN_DENIED', 'Cross-site requests are not accepted.', 403);
+            }
             if (config.mode === 'demo') {
                 const host = (req.headers.host ?? '').replace(/:\d+$/, '');
                 requireThat(['localhost', '127.0.0.1', '[::1]'].includes(host), 'HOST_DENIED', 'Local demo host only.', 403);
             }
             if (req.method === 'OPTIONS') {
-                res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type,Idempotency-Key,MCP-Protocol-Version', 'Access-Control-Max-Age': '300' });
+                res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type,Idempotency-Key,MCP-Protocol-Version,X-CSRF-Token', 'Access-Control-Max-Age': '300' });
                 res.end();
                 return;
             }
             if (pathname === '/healthz') {
-                json(res, 200, { ok: true, version: '0.1.0', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
+                json(res, 200, { ok: true, version: '0.2.0', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
                 return;
             }
             const key = req.socket.remoteAddress ?? 'unknown';
@@ -94,16 +104,43 @@ export function createApp(config: Settings, service: MealService) {
                 json(res, 200, { mode: config.mode, firebaseApiKey: config.firebaseApiKey, enterpriseConfigured: !!config.agentAudience && Object.keys(config.agentEmails).length > 0, demoIdentities: config.mode === 'demo' ? DEMO_IDENTITIES : [] });
                 return;
             }
+            if (config.mode === 'local' && pathname === '/api/catalog' && req.method === 'GET') {
+                const states = await Promise.all((await service.store.ids()).map(id => service.store.read(id)));
+                json(res, 200, { vendors: states.map(s => s.vendor), items: states.flatMap(s => s.items), serverTime: new Date().toISOString() });
+                return;
+            }
+            if (accounts && ['/api/auth/login', '/api/auth/register'].includes(pathname) && req.method === 'POST') {
+                const id = req.socket.remoteAddress ?? 'unknown';
+                if (authLimits.size > 5000) for (const [k, v] of authLimits) if (v.until <= Date.now()) authLimits.delete(k);
+                let entry = authLimits.get(id);
+                if (!entry || entry.until <= Date.now()) { entry = { count: 0, until: Date.now() + 60000 }; authLimits.set(id, entry); }
+                requireThat(++entry.count <= 12, 'RATE_LIMIT', 'Too many sign-in attempts. Try again in a minute.', 429);
+                const input = await body(req);
+                const account = pathname.endsWith('register') ? await accounts.register(input) : await accounts.login(input);
+                json(res, 200, await accounts.start(account, res)); return;
+            }
             if (pathname === '/api/demo/login' && req.method === 'POST') {
                 json(res, 200, auth.demoLogin(object(await body(req)).id));
                 return;
             }
             if (pathname.startsWith('/api/')) {
-                const actor = await auth.user(req);
+                const actor = accounts ? accounts.authorize(req) : await auth.user(req);
                 const method = req.method;
                 if (pathname === '/api/session' && method === 'GET') {
-                    json(res, 200, { actor });
+                    json(res, 200, { actor, ...(accounts ? { csrfToken: accounts.session(req).session.csrfToken } : {}) });
                     return;
+                }
+                if (accounts && pathname === '/api/auth/logout' && method === 'POST') {
+                    await accounts.logout(req, res); json(res, 200, { ok: true }); return;
+                }
+                if (checkout && pathname === '/api/checkout/quote' && method === 'POST') {
+                    json(res, 200, await checkout.quote(actor, await body(req))); return;
+                }
+                if (checkout && pathname.startsWith('/api/checkouts/') && method === 'GET') {
+                    json(res, 200, { checkout: checkout.lookup(actor, decodeURIComponent(pathname.slice('/api/checkouts/'.length))) }); return;
+                }
+                if (checkout && pathname === '/api/checkouts' && method === 'POST') {
+                    json(res, 201, await checkout.submit(actor, await body(req), String(req.headers['idempotency-key'] ?? ''))); return;
                 }
                 if (pathname === '/api/state' && method === 'GET') {
                     json(res, 200, await service.snapshot(actor, config.mode));
@@ -114,6 +151,7 @@ export function createApp(config: Settings, service: MealService) {
                     return;
                 }
                 if (pathname === '/api/orders' && method === 'POST') {
+                    requireThat(config.mode !== 'local', 'USE_CHECKOUT', 'Use /api/checkouts for the current ordering flow.', 409);
                     json(res, 201, await service.createOrder(actor, await body(req), String(req.headers['idempotency-key'] ?? '')));
                     return;
                 }
@@ -124,6 +162,12 @@ export function createApp(config: Settings, service: MealService) {
                 const area = parts[3];
                 const id = parts[4] ?? '';
                 const action = parts[5];
+                if (area === 'profile' && method === 'PATCH') {
+                    await service.updateVendor(actor, vendor, await body(req)); json(res, 200, { ok: true }); return;
+                }
+                if (area === 'items' && !id && method === 'POST') {
+                    json(res, 201, await service.addItem(actor, vendor, await body(req))); return;
+                }
                 if (area === 'slots' && method === 'POST') {
                     json(res, 200, await service.openPickupWindows(actor, vendor, await body(req)));
                     return;

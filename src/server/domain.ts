@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { Actor, BreakPlan, MenuItem, Order, OrderLine, Proposal, PublicOrder, Quote, RecoveryOption, Selection, Slot, Snapshot, VendorState } from '../shared/model.js';
+import type { Actor, BreakPlan, MealPlan, MenuItem, Order, OrderLine, Proposal, PublicOrder, Quote, RecoveryOption, Selection, Slot, Snapshot, VendorState } from '../shared/model.js';
 import { atRisk } from '../shared/model.js';
 import { bool, integer, iso, object, requireThat, text } from './errors.js';
 import type { Store } from './store.js';
@@ -19,8 +19,10 @@ function audit(s: VendorState, actor: Actor, action: string, subjectId: string, 
     if (s.audit.length > 200)
         s.audit.splice(0, s.audit.length - 200);
 }
-export function parsePlan(input: unknown, now: number): BreakPlan {
+export function parsePlan(input: unknown, now: number): MealPlan {
     const p = object(input);
+    if (p.mode === 'pickup') return { mode: 'pickup', budgetSen: integer(p.budgetSen, 'Budget in sen', 100, 50000) };
+    requireThat(p.mode === undefined || p.mode === 'break', 'INVALID_PLAN', 'Unknown planning mode.');
     const plan: BreakPlan = {
         breakStartAt: iso(p.breakStartAt, 'Break start'), nextClassAt: iso(p.nextClassAt, 'Next class'),
         walkToMinutes: integer(p.walkToMinutes, 'Walk to counter', 0, 30), eatMinutes: integer(p.eatMinutes, 'Eating time', 0, 60),
@@ -46,12 +48,13 @@ function linesFor(s: VendorState, selection: Selection[]): {
     return { items, lines: selection.map((x, i) => ({ ...x, name: items[i]!.name, unitPriceSen: items[i]!.priceSen, prepUnits: items[i]!.prepUnits })) };
 }
 function delay(s: VendorState, itemId: string): number { return s.incidents.filter(i => i.active && (!i.itemIds.length || i.itemIds.includes(itemId))).reduce((n, i) => n + i.delayMinutes, 0); }
-function calculateQuote(s: VendorState, selections: Selection[], plan: BreakPlan, now: number): Quote {
+function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan, now: number): Quote {
     const { lines, items } = linesFor(s, selections);
     const totalSen = lines.reduce((n, x) => n + x.unitPriceSen * x.quantity, 0);
     const units = lines.reduce((n, x) => n + x.prepUnits * x.quantity, 0);
-    const latest = Date.parse(plan.nextClassAt) - (plan.eatMinutes + plan.returnMinutes + plan.bufferMinutes) * MINUTE;
-    const earliest = Math.max(now, Date.parse(plan.breakStartAt)) + plan.walkToMinutes * MINUTE;
+    const isBreak = 'nextClassAt' in plan;
+    const latest = isBreak ? Date.parse(plan.nextClassAt) - (plan.eatMinutes + plan.returnMinutes + plan.bufferMinutes) * MINUTE : now + 24 * 60 * MINUTE;
+    const earliest = isBreak ? Math.max(now, Date.parse(plan.breakStartAt)) + plan.walkToMinutes * MINUTE : now;
     const ready = now + Math.max(...items.map(x => x.prepMinutes + delay(s, x.id))) * MINUTE;
     const reasons: string[] = [];
     if (!s.vendor.open)
@@ -64,7 +67,7 @@ function calculateQuote(s: VendorState, selections: Selection[], plan: BreakPlan
         reasons.push('Your break does not leave enough time to walk, collect and eat.');
     const slots = reasons.length ? [] : s.slots.filter(x => Date.parse(x.startAt) >= earliest && Date.parse(x.endAt) <= latest && Date.parse(x.endAt) >= ready && Date.parse(x.startAt) > now && x.reservedUnits + units <= x.kitchenCapacity && x.reservedHandovers + 1 <= x.pickupCapacity);
     if (!slots.length && !reasons.length)
-        reasons.push('No pickup window fits the current preparation time and available capacity. Try a quicker meal or a longer break.');
+        reasons.push('No pickup window fits the current preparation time and available capacity. Choose another time or meal.');
     return { vendorId: s.vendor.id, totalSen, earliestPickupAt: stamp(earliest), latestPickupAt: stamp(latest), slots: structuredClone(slots), reasons };
 }
 function reserve(s: VendorState, lines: OrderLine[], slotId: string): void {
@@ -110,8 +113,8 @@ function safeOrder(order: Order, actor: Actor): PublicOrder {
     return actor.role === 'student' && actor.id === order.studentId && !terminal(order) ? { ...rest, pickupCode } : rest;
 }
 export class MealService {
-    constructor(public readonly store: Store, private clock: () => number = Date.now) { }
-    async snapshot(actor: Actor, mode: 'demo' | 'firebase'): Promise<Snapshot> {
+    constructor(public readonly store: Store, private clock: () => number = Date.now, private payment: Order['payment'] = 'simulated') { }
+    async snapshot(actor: Actor, mode: 'demo' | 'firebase' | 'local'): Promise<Snapshot> {
         const states = await Promise.all((await this.store.ids()).map(id => this.store.read(id)));
         const owned = states.filter(s => s.vendor.id === actor.vendorId);
         const visibleOrders = actor.role === 'student' ? states.flatMap(s => s.orders.filter(o => o.studentId === actor.id)) : owned.flatMap(s => s.orders);
@@ -155,10 +158,10 @@ export class MealService {
             reserve(s, lines, slot.id);
             const order: Order = {
                 id: randomUUID(), studentId: actor.id, vendorId, lines, totalSen: quote.totalSen, slotId,
-                plan, latestPickupAt: quote.latestPickupAt, earliestPickupAt: quote.earliestPickupAt,
+                plan, latestPickupAt: 'nextClassAt' in plan ? quote.latestPickupAt : slot.endAt, earliestPickupAt: quote.earliestPickupAt,
                 estimatedReadyAt: slot.endAt, status: 'confirmed', version: 1,
                 pickupCode: randomBytes(5).toString('hex').toUpperCase(), createdAt: stamp(now), updatedAt: stamp(now),
-                collectionFailures: 0, collectionLockedUntil: null, payment: 'simulated',
+                collectionFailures: 0, collectionLockedUntil: null, payment: this.payment, ...(this.payment === 'pay_at_pickup' ? { paymentStatus: 'unpaid' as const } : {}),
             };
             s.orders.push(order);
             s.requests[requestKey] = { fingerprint, orderId: order.id, createdAt: stamp(now) };
@@ -176,7 +179,7 @@ export class MealService {
             order.status = 'cancelled';
             touch(order, this.clock());
             invalidate(s, order.id);
-            audit(s, actor, 'order.cancelled', order.id, 'Unprepared stock and reservations released. Payment was simulated.', this.clock());
+            audit(s, actor, 'order.cancelled', order.id, 'Unprepared stock and reservations released. No online payment was taken.', this.clock());
         });
     }
     async changeStatus(actor: Actor, vendorId: string, orderId: string, input: unknown): Promise<void> {
@@ -195,7 +198,8 @@ export class MealService {
     }
     async collect(actor: Actor, vendorId: string, orderId: string, input: unknown): Promise<void> {
         operator(actor, vendorId);
-        const code = text(object(input).code, 'Pickup code', 1, 40).toUpperCase();
+        const body = object(input);
+        const code = text(body.code, 'Pickup code', 1, 40).toUpperCase();
         // Failed attempts are committed, not rolled back with an exception.
         const result = await this.store.transact(vendorId, s => {
             const order = getOrder(s, orderId);
@@ -214,6 +218,8 @@ export class MealService {
                 audit(s, actor, 'pickup.rejected', order.id, 'Incorrect pickup code.', now);
                 return false;
             }
+            requireThat(order.payment !== 'pay_at_pickup' || body.paymentReceived === true, 'PAYMENT_REQUIRED', 'Confirm payment was received at this counter before completing collection.', 409);
+            if (order.payment === 'pay_at_pickup') { order.paymentStatus = 'paid'; order.paidAt = stamp(now); }
             order.status = 'collected';
             order.pickupCode = '';
             touch(order, now);
@@ -231,6 +237,8 @@ export class MealService {
         const kitchenCapacity = integer(b.kitchenCapacity, 'Online kitchen workload', 1, 100);
         const pickupCapacity = integer(b.pickupCapacity, 'Online handovers', 1, 50);
         return this.store.transact(vendorId, s => {
+            s.vendor.onlineKitchenCapacity = kitchenCapacity;
+            s.vendor.onlinePickupCapacity = pickupCapacity;
             const ids = new Set(s.slots.map(x => x.id));
             const fresh = seedVendor(vendorId, this.clock()).slots.filter(x => !ids.has(x.id));
             for (const slot of fresh)
@@ -239,7 +247,7 @@ export class MealService {
             const referenced = new Set(s.orders.map(o => o.slotId));
             s.slots = s.slots.filter(x => Date.parse(x.endAt) >= this.clock() || referenced.has(x.id));
             s.slots.sort((a, b) => a.startAt.localeCompare(b.startAt));
-            audit(s, actor, 'slots.opened', vendorId, `${fresh.length} new windows; existing reservations unchanged.`, this.clock());
+            if (fresh.length) audit(s, actor, 'slots.opened', vendorId, `${fresh.length} new windows; existing reservations unchanged.`, this.clock());
             return { added: fresh.length };
         });
     }
@@ -248,20 +256,46 @@ export class MealService {
         const open = bool(object(input).open, 'Open status');
         await this.store.transact(vendorId, s => { s.vendor.open = open; audit(s, actor, 'vendor.open', vendorId, open ? 'New orders enabled.' : 'New orders paused.', this.clock()); });
     }
-    async updateItem(actor: Actor, vendorId: string, itemId: string, input: unknown): Promise<void> {
-        operator(actor, vendorId);
+    async updateVendor(actor: Actor, vendorId: string, input: unknown): Promise<void> {
+        operator(actor, vendorId); const b = object(input);
+        await this.store.transact(vendorId, s => {
+            s.vendor.name = text(b.name, 'Kitchen name', 2, 60);
+            s.vendor.location = text(b.location, 'Pickup location', 2, 120);
+            s.vendor.description = text(b.description, 'Description', 2, 240);
+            if (b.confirmMenu === true) s.vendor.synthetic = false;
+            audit(s, actor, 'vendor.profile', vendorId, 'Profile updated; menu verification is the operator responsibility.', this.clock());
+        });
+    }
+    private menuFields(input: unknown): Omit<MenuItem, 'id' | 'vendorId'> {
         const b = object(input);
+        const category = text(b.category, 'Category');
+        const art = text(b.art, 'Illustration');
+        requireThat(['Rice', 'Noodles', 'Light bites', 'Drinks'].includes(category), 'INVALID_INPUT', 'Choose a supported category.');
+        requireThat(['rice', 'noodles', 'toast', 'salad', 'drink'].includes(art), 'INVALID_INPUT', 'Choose a supported illustration.');
+        return { name: text(b.name, 'Meal name', 2, 80), description: text(b.description, 'Description', 2, 240), category: category as MenuItem['category'], art: art as MenuItem['art'],
+            priceSen: integer(b.priceSen, 'Price in sen', 50, 50000), stock: integer(b.stock, 'Stock', 0, 500),
+            prepMinutes: integer(b.prepMinutes, 'Preparation minutes', 1, 120), prepUnits: integer(b.prepUnits, 'Kitchen workload', 1, 20), enabled: bool(b.enabled, 'Availability'), tags: [], allergens: null };
+    }
+    async addItem(actor: Actor, vendorId: string, input: unknown): Promise<MenuItem> {
+        operator(actor, vendorId); const fields = this.menuFields(input);
+        return this.store.transact(vendorId, s => {
+            requireThat(s.items.length < 100, 'MENU_LIMIT', 'This kitchen supports at most 100 menu items.', 409);
+            const item = { ...fields, id: randomUUID(), vendorId }; s.items.push(item);
+            audit(s, actor, 'menu.created', item.id, 'New item added; allergen information is unknown.', this.clock()); return item;
+        });
+    }
+    async updateItem(actor: Actor, vendorId: string, itemId: string, input: unknown): Promise<void> {
+        operator(actor, vendorId); const b = object(input);
+        const fields = b.name !== undefined ? this.menuFields(b) : undefined;
         const enabled = b.enabled === undefined ? undefined : bool(b.enabled, 'Availability');
         const stock = b.stock === undefined ? undefined : integer(b.stock, 'Available stock', 0, 500);
-        requireThat(enabled !== undefined || stock !== undefined, 'INVALID_INPUT', 'Provide enabled or stock.');
+        requireThat(fields || enabled !== undefined || stock !== undefined, 'INVALID_INPUT', 'Provide menu details, enabled or stock.');
         await this.store.transact(vendorId, s => {
-            const item = s.items.find(x => x.id === itemId);
-            requireThat(item, 'NOT_FOUND', 'Item not found.', 404);
-            if (enabled !== undefined)
-                item.enabled = enabled;
-            if (stock !== undefined)
-                item.stock = stock;
-            audit(s, actor, 'menu.updated', itemId, 'Operator updated available, unreserved stock or menu availability.', this.clock());
+            const item = s.items.find(x => x.id === itemId); requireThat(item, 'NOT_FOUND', 'Item not found.', 404);
+            if (fields) Object.assign(item, fields);
+            if (enabled !== undefined) item.enabled = enabled;
+            if (stock !== undefined) item.stock = stock;
+            audit(s, actor, 'menu.updated', itemId, 'Available, unreserved stock and menu details updated; confirmed order prices are unchanged.', this.clock());
         });
     }
     private refreshDelayed(s: VendorState): void {
@@ -303,15 +337,17 @@ export class MealService {
     }
     private options(s: VendorState, orderId: string): RecoveryOption[] {
         const order = getOrder(s, orderId);
-        if (order.status !== 'confirmed' || !atRisk(order) || Date.parse(order.latestPickupAt) <= this.clock())
+        if (order.status !== 'confirmed' || !atRisk(order) || ('nextClassAt' in order.plan && Date.parse(order.latestPickupAt) <= this.clock()))
             return [];
         const copy = structuredClone(s);
         const saved = getOrder(copy, orderId);
         release(copy, saved);
+        if (order.lines.length !== 1) return [];
+        const original = copy.items.find(x => x.id === order.lines[0]!.itemId)!;
         const quantity = order.lines.reduce((n, x) => n + x.quantity, 0);
         const options: RecoveryOption[] = [];
         for (const item of copy.items) {
-            if (order.lines.some(x => x.itemId === item.id) || item.category === 'Drinks')
+            if (order.lines.some(x => x.itemId === item.id) || (item.category === 'Drinks') !== (original.category === 'Drinks'))
                 continue;
             // No hidden charge: alternatives may not cost more than the original simulated total.
             const plan = { ...order.plan, budgetSen: Math.min(order.totalSen, order.plan.budgetSen) };
@@ -384,13 +420,14 @@ export class MealService {
             order.slotId = option.slotId;
             order.totalSen = option.totalSen;
             order.estimatedReadyAt = option.readyAt;
+            if (!('nextClassAt' in order.plan)) order.latestPickupAt = option.readyAt;
             order.pickupCode = randomBytes(5).toString('hex').toUpperCase();
             order.collectionFailures = 0;
             order.collectionLockedUntil = null;
             touch(order, this.clock());
             proposal.status = 'accepted';
             invalidate(s, order.id, proposal.id);
-            audit(s, actor, 'proposal.accepted', id, 'Student consent recorded; resources atomically reassigned. Simulated total updated, no real refund.', this.clock());
+            audit(s, actor, 'proposal.accepted', id, 'Student consent recorded; resources atomically reassigned. Amount due updated; no online payment or refund.', this.clock());
         });
     }
     async agentState(actor: Actor): Promise<unknown> {

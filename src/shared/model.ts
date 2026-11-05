@@ -12,6 +12,8 @@ export interface Vendor {
     location: string;
     open: boolean;
     synthetic: boolean;
+    onlineKitchenCapacity?: number;
+    onlinePickupCapacity?: number;
 }
 export interface MenuItem {
     id: string;
@@ -46,6 +48,8 @@ export interface BreakPlan {
     bufferMinutes: number;
     budgetSen: number;
 }
+export interface PickupPlan { mode: 'pickup'; budgetSen: number; }
+export type MealPlan = BreakPlan | PickupPlan;
 export interface Selection {
     itemId: string;
     quantity: number;
@@ -63,7 +67,8 @@ export interface Order {
     lines: OrderLine[];
     totalSen: number;
     slotId: string;
-    plan: BreakPlan;
+    plan: MealPlan;
+    checkoutId?: string;
     latestPickupAt: string;
     earliestPickupAt: string;
     estimatedReadyAt: string;
@@ -74,7 +79,9 @@ export interface Order {
     updatedAt: string;
     collectionFailures: number;
     collectionLockedUntil: string | null;
-    payment: 'simulated';
+    payment: 'simulated' | 'pay_at_pickup';
+    paymentStatus?: 'unpaid' | 'paid';
+    paidAt?: string;
 }
 export interface Incident {
     id: string;
@@ -154,10 +161,10 @@ export interface Snapshot {
     incidents: Incident[];
     audit: AuditEvent[];
     serverTime: string;
-    mode: 'demo' | 'firebase';
+    mode: 'demo' | 'firebase' | 'local';
 }
 export interface AppConfig {
-    mode: 'demo' | 'firebase';
+    mode: 'demo' | 'firebase' | 'local';
     firebaseApiKey: string;
     enterpriseConfigured: boolean;
     demoIdentities: Actor[];
@@ -165,3 +172,7 @@ export interface AppConfig {
 export const money = (sen: number): string => `RM ${(sen / 100).toFixed(2)}`;
 export const time = (iso: string): string => new Intl.DateTimeFormat('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' }).format(new Date(iso));
 export const atRisk = (o: Pick<Order, 'estimatedReadyAt' | 'latestPickupAt' | 'status'>): boolean => ['confirmed', 'preparing'].includes(o.status) && o.estimatedReadyAt > o.latestPickupAt;
+
+export interface BasketGroup { vendorId: string; items: Selection[]; slotId?: string; }
+export interface BasketQuote { groups: Quote[]; totalSen: number; reasons: string[]; }
+export interface CheckoutResult { id: string; orders: PublicOrder[]; totalSen: number; }

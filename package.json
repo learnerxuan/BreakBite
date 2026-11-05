@@ -1,7 +1,12 @@
 {
-  "name": "breakbite", "version": "0.1.0", "private": true, "type": "module",
-  "description": "Break-aware campus ordering with capacity-safe pickup and consent-based recovery",
-  "engines": { "node": ">=22.16.0" },
+  "name": "breakbite",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Order-ahead campus dining with multi-kitchen checkout and JSON persistence",
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/assets.mjs",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
@@ -9,7 +14,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test dist-tests/tests/*.test.js",
     "check": "npm run typecheck && npm test && npm run build",
-    "seed:cloud": "node --env-file-if-exists=.env dist/server/seed-cloud.js"
+    "seed:cloud": "node --env-file-if-exists=.env dist/server/seed-cloud.js",
+    "operator": "node --env-file-if-exists=.env dist/server/operator-cli.js"
   },
-  "devDependencies": { "@types/node": "25.1.0", "typescript": "5.8.3" }
+  "devDependencies": {
+    "@types/node": "25.1.0",
+    "typescript": "5.8.3"
+  }
 }

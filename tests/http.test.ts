@@ -15,7 +15,7 @@ async function fixture(t: test.TestContext) {
     await store.initialize(seedVendor('bowl-lab', now));
     await store.initialize(seedVendor('noodle-co', now));
     const service = new MealService(store, () => now);
-    const server = createApp(settings({ DEMO_MCP_TOKEN: AGENT_TOKEN }), service);
+    const server = createApp(settings({ AUTH_MODE: 'demo', DEMO_MCP_TOKEN: AGENT_TOKEN }), service);
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
