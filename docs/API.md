@@ -76,3 +76,14 @@ Photos are served by exact hashed raster paths under `/media/`. Input bytes are 
 ## Deferred integrations
 
 Legacy MCP tools are retained, but actual Gemini Enterprise connectivity is unverified. The v0.3 product requires local mode. Google migration must preserve atomic multi-kitchen writes, current permissions and the full acceptance suite.
+
+## v0.3.1 Web Push
+
+- `GET /api/push/config`: public enabled flag and VAPID public key (never the private key).
+- `GET /api/push/status`: student-owned devices and sanitized acceptance/error status.
+- `POST /api/push/subscribe`: `{ subscription: PushSubscriptionJSON, label }`; authenticated student + CSRF.
+- `POST /api/push/unsubscribe`: `{ id }`; only the owning student may remove the device.
+- `POST /api/push/test`: `{ id }`; queues a test for an owned active device, at most once per minute.
+- State-changing push routes require HTTPS configuration or loopback development. No arbitrary URL dispatch route.
+- `/sw.js` is a push-only worker, served with no-cache and scope `/`.
+- See [WEB_PUSH.md](WEB_PUSH.md) for private key setup and live-device acceptance.

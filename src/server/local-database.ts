@@ -1,3 +1,4 @@
+import type { PushDevice, PushJob } from '../shared/push.js';
 import type { StudentProfile, Notice } from '../shared/features.js';
 import { isClosed, foodCheck } from '../shared/features.js';
 import { open, mkdir, readFile, rename, unlink } from 'node:fs/promises';
@@ -19,6 +20,7 @@ export interface CheckoutRecord {
     orders: { vendorId: string; orderId: string }[];
 }
 export interface LocalData {
+    pushDevices?: Record<string, PushDevice>; pushJobs?: Record<string, PushJob>;
     schemaVersion: 2; profiles?: Record<string, StudentProfile>; notices?: Notice[]; vendors: Record<string, VendorState>; accounts: LocalAccount[];
     sessions: Record<string, LocalSession>; checkouts: Record<string, CheckoutRecord>;
 }

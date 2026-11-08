@@ -1,5 +1,8 @@
 # Local product guide — v0.3
 
+> v0.3.1 update: Availability has its own tab and opt-in background Web Push is implemented. See [WEB_PUSH.md](WEB_PUSH.md) for setup, security and unverified live-device delivery. Earlier page-only notification limitations below describe v0.3. SMS/email and cloud deployment remain separate.
+
+
 ## Start here
 
 - Use Node.js 22.16+.

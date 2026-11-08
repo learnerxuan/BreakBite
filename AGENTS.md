@@ -1,7 +1,7 @@
 # Contributor and AI Coding Rules
 
 - Read `README.md`, `docs/IMPLEMENTATION.md` and `docs/LOCAL_MVP.md` first.
-- v0.3 is an implemented local-account JSON product. Google/Firebase/Gemini integration is deferred.
+- v0.3.1 is an implemented local-account JSON product. Google/Firebase/Gemini integration is deferred.
 - Preserve the ordinary order-ahead flow; Fit my break is optional.
 - Keep English documentation concise and distinguish tested code from deployment claims.
 
@@ -37,4 +37,11 @@
 - Current vendor-caused lateness must not be counted as a student no-show.
 - Earlier-slot help cannot displace other orders; recheck sibling pickup timing.
 - Timetable import requires an owned preview and explicit confirmation; unsupported recurrence/timezone must be warned, not guessed.
-- Camera support, browser delivery and public deployment are separate from source-code completion. Never claim closed-browser push or live APSpace sync.
+- Camera support, browser delivery and public deployment are separate from source-code completion. Web Push code exists; never claim real device delivery without verification or claim live APSpace sync.
+
+## Push boundaries
+
+- Preserve explicit opt-in, CSRF, account ownership, server-side logout/reset revocation and generic lock-screen text.
+- Never expose arbitrary outbound push URLs, keys, pickup credentials or full order data.
+- Maintain durable retries, short TTLs and stale/read-notice suppression. Push-service acceptance is not device delivery.
+- Keep Explore and Availability separate. No service-worker API caching or offline ordering.

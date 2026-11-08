@@ -1,3 +1,4 @@
+import { revokePush, pushDigest } from './push.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { accountActor, LocalDatabase, type LocalAccount, type LocalSession } from './local-database.js';
@@ -72,7 +73,7 @@ export class Accounts {
         return actor;
     }
     async logout(req: IncomingMessage, res: ServerResponse): Promise<void> {
-        const token = this.token(req); await this.db.transaction(d => { delete d.sessions[digest(token)]; });
+        const token = this.token(req); await this.db.transaction(d => { const session = d.sessions[digest(token)]; if (session) revokePush(d, session.accountId, pushDigest(session.csrfToken)); delete d.sessions[digest(token)]; });
         res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${this.secureCookie ? '; Secure' : ''}`);
     }
     async resetPassword(email: string, password: string): Promise<void> {
@@ -80,6 +81,7 @@ export class Accounts {
         const salt = randomBytes(16).toString('hex'); const passwordHash = (await derive(password, salt)).toString('hex');
         await this.db.transaction(d => {
             const a = d.accounts.find(x => x.email === normalized); requireThat(a, 'NOT_FOUND', 'Account not found.', 404);
+            revokePush(d, a.id);
             a.salt = salt; a.passwordHash = passwordHash; a.failures = 0; a.lockedUntil = 0;
             for (const [key, s] of Object.entries(d.sessions)) if (s.accountId === a.id) delete d.sessions[key];
         });

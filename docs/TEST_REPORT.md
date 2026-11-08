@@ -1,3 +1,14 @@
+# v0.3.1 verification — 8 November 2026
+
+- Strict typecheck, **128 automated tests (0 failures)**, production build: passed in this environment.
+- The previous 107 checks remain passing; 21 additional checks cover Web Push encryption/signatures, HTTP ownership/CSRF, retries/restart, expired subscriptions, shared-device revocation, service-worker push/click, opt-in UI and rollback.
+- RFC 8291 published encryption example matched byte-for-byte. Generated payloads also decrypted with an independent receiver-side test; VAPID ES256 signatures verified independently.
+- v0.3 browser regression passed through the existing renderer/local-API bridge, updated to check that kitchen availability moved out of Explore.
+- No external push-service or real closed-tab phone test was executed. This environment blocks normal Chromium localhost navigation and external DNS resolution.
+- [Setup and deployment acceptance](WEB_PUSH.md). Provider acceptance is not an OS display receipt.
+
+---
+
 # Verification report — v0.3, 8 November 2026
 
 ## Executed checks

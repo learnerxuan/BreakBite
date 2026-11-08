@@ -22,7 +22,11 @@ with sync_playwright() as pw:
         boot(pg, args.base_url, args.bridge); return pg
     try:
         student = page(); expect(student.locator('.bb-meal')).not_to_have_count(0)
+        expect(student.locator('.bb-loads')).to_have_count(0)
+        student.get_by_role('button', name='Availability', exact=True).click()
         expect(student.get_by_text('Online bookings, not the physical queue', exact=True)).to_be_visible()
+        student.get_by_role('button', name='Explore', exact=True).click()
+        expect(student.locator('.bb-loads')).to_have_count(0)
         student.screenshot(path=str(OUT / 'home-desktop.png'), full_page=True)
         for w in [360, 390, 768, 1440]: student.set_viewport_size({'width': w, 'height': 1000}); overflow(student)
         login(student, f'product-{uuid.uuid4().hex[:8]}@example.test', register=True)
@@ -105,7 +109,7 @@ with sync_playwright() as pw:
         student.locator('#class-form input[name=endAt]').fill((end+timedelta(hours=8)).strftime('%Y-%m-%dT%H:%M'))
         student.get_by_role('button', name='Add class', exact=True).click()
         expect(student.locator('.bb-class-row')).to_have_count(1)
-        content = '\r\n'.join(['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','UID:browser-class','SUMMARY:Imported networks',f'DTSTART:{(start+timedelta(days=1)).strftime("%Y%m%dT%H%M%SZ")}',f'DTEND:{(end+timedelta(days=1)).strftime("%Y%m%dT%H%M%SZ")}','RRULE:FREQ=WEEKLY;COUNT=3','END:VEVENT','END:VCALENDAR'])
+        content = '\r\n'.join(['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT','UID:browser-class','SUMMARY:Imported networks',f'DTSTART:{(start+timedelta(days=1)).strftime("%Y%m%dT%H%M%SZ")}',f'DTEND:{(end+timedelta(days=1)).strftime("%Y%m%dT%H%M%SZ")}', 'RRULE:FREQ=WEEKLY;COUNT=3','END:VEVENT','END:VCALENDAR'])
         student.locator('input[name=calendar]').set_input_files({'name':'timetable.ics','mimeType':'text/calendar','buffer':content.encode()})
         student.get_by_role('button', name='Preview import', exact=True).click()
         expect(student.locator('#confirm-ics-form input[name=classId]')).to_have_count(3)

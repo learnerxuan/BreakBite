@@ -9,7 +9,7 @@ export interface ViewState {
     basketMessages: string[]; earlier: Record<string, { slots: import('../shared/model.js').Slot[]; message: string }>;
     config: AppConfig | null; actor: Actor | null; snapshot: Snapshot | null;
     vendors: Vendor[]; items: MenuItem[]; cart: CartLine[];
-    view: 'explore' | 'orders' | 'vendor' | 'saved' | 'planner' | 'inbox'; vendorTab: 'queue' | 'menu' | 'recovery' | 'settings';
+    view: 'explore' | 'availability' | 'orders' | 'vendor' | 'saved' | 'planner' | 'inbox'; vendorTab: 'queue' | 'menu' | 'recovery' | 'settings';
     search: string; category: string; vendorFilter: string;
     fitBreak: boolean; plan: BreakPlan; quote: BasketQuote | null; chosen: Record<string, string>;
     transferMinutes: number; busy: boolean; offline: boolean;

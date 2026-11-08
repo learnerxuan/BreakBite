@@ -1,3 +1,5 @@
+import { loadPushKeys } from './web-push.js';
+import { PushService } from './push.js';
 import { ProductService } from './product.js';
 import { settings } from './config.js';
 import { FileStore, FirestoreStore, type Store } from './store.js';
@@ -14,6 +16,7 @@ else {
     const local = new FileStore(config.dataDir); await local.load(); store = local;
     for (const id of VENDOR_IDS) await store.initialize(seedVendor(id));
 }
+const push = db ? new PushService(db, await loadPushKeys(config.dataDir)) : undefined;
 const product = db ? new ProductService(db) : undefined;
 const service = new MealService(store, Date.now, config.mode === 'local' ? 'pay_at_pickup' : 'simulated');
 // Rolling capacity windows use each operator's configured online allocation. They never reset reservations.
@@ -32,13 +35,14 @@ await refreshWindows(); await product?.tick();
 const reminderTimer = setInterval(() => { void product?.tick().catch(e => console.error('Collection reminders:', e.message)); }, 15000); reminderTimer.unref();
 const timer = setInterval(() => { void refreshWindows().catch(e => console.error('Pickup schedule:', e.message)); }, 60000);
 timer.unref();
-const server = createApp(config, service, db);
+const pushTimer = setInterval(() => { void push?.pump().catch(() => console.error('Push queue unavailable; inbox remains authoritative.')); }, 5000); pushTimer.unref();
+const server = createApp(config, service, db, push);
 server.listen(config.port, config.host, () => console.log(`BreakBite · http://${config.host}:${config.port} · ${config.mode === 'local' ? 'JSON accounts and orders; pay at each counter' : config.mode + ' adapter'}\nOperator setup: stop the server, then run npm run operator`));
-server.on('error', async error => { console.error('Could not start server:', error.message); clearInterval(timer); clearInterval(reminderTimer); await db?.close(); process.exitCode = 1; });
+server.on('error', async error => { console.error('Could not start server:', error.message); clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer); await push?.settle(); await db?.close(); process.exitCode = 1; });
 let closing = false;
 const shutdown = () => {
-    if (closing) return; closing = true; clearInterval(timer); clearInterval(reminderTimer);
-    server.close(async () => { await db?.close(); process.exit(0); });
+    if (closing) return; closing = true; clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer);
+    server.close(async () => { await push?.settle(); await db?.close(); process.exit(0); });
     server.closeIdleConnections();
 };
 process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);

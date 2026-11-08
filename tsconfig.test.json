@@ -1,5 +1,15 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": ".", "outDir": "dist-tests", "noUnusedLocals": false, "noUnusedParameters": false },
-  "include": ["src/server/**/*.ts", "src/shared/**/*.ts", "tests/**/*.ts"]
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-tests",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/server/**/*.ts",
+    "src/shared/**/*.ts",
+    "tests/**/*.ts",
+    "src/web/push-client.ts"
+  ]
 }

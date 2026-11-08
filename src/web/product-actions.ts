@@ -49,7 +49,7 @@ export function productActions(s: ViewState, h: Hooks) {
             if (action === 'food-details') { s.detailItem = s.items.find(i => i.id === id) ?? null; h.render(); return true; }
             if (action === 'open-scanner') { s.scanner = true; s.scanResult = null; h.render(); return true; }
             if (action === 'start-camera') { void startCamera(payload => h.work(() => resolve(payload))).catch(e => h.notify(e instanceof Error ? e.message : 'Camera unavailable.', true)); return true; }
-            const actions = ['favourite', 'save-usual', 'rename-usual', 'remove-usual', 'reorder', 'qr', 'start-camera', 'read-notices', 'enable-notices', 'delete-class', 'clear-classes', 'use-break', 'help-order', 'move-earlier', 'ask-alternative', 'uncollected', 'correct-no-show', 'remove-photo'];
+            const actions = ['favourite', 'save-usual', 'rename-usual', 'remove-usual', 'reorder', 'qr', 'start-camera', 'read-notices', 'delete-class', 'clear-classes', 'use-break', 'help-order', 'move-earlier', 'ask-alternative', 'uncollected', 'correct-no-show', 'remove-photo'];
             if (!action || !actions.includes(action)) return false;
             if (!s.actor) { s.auth = 'login'; h.render(); return true; }
             void h.work(async () => {
@@ -67,10 +67,7 @@ export function productActions(s: ViewState, h: Hooks) {
                     s.qr = { payload: result.payload, code: o?.pickupCode ?? '', kitchen: s.vendors.find(v => v.id === vendorId)?.name ?? '' };
                 } 
                 else if (action === 'read-notices') { await post('notices/read'); await h.refresh(); }
-                else if (action === 'enable-notices') {
-                    if (!('Notification' in window) || !isSecureContext) throw new Error('Device notifications are unavailable here. Your account inbox still receives reminders.');
-                    const permission = await Notification.requestPermission(); h.notify(permission === 'granted' ? 'Device notices enabled while the website is open. Closed-browser push is not configured.' : 'Device notices are off. Use your account inbox.');
-                } else if (action === 'delete-class') { await post('timetable/delete', { id }); await h.refresh(); }
+                else if (action === 'delete-class') { await post('timetable/delete', { id }); await h.refresh(); }
                 else if (action === 'clear-classes') { if (!confirm('Delete all saved classes and the pending import preview?')) return; await post('timetable/delete', { all: true }); await h.refresh(); }
                 else if (action === 'use-break') { s.fitBreak = true; s.plan.breakStartAt = target.dataset.start!; s.plan.nextClassAt = target.dataset.end!; h.invalidate(); s.view = 'explore'; h.notify('Break applied. Review walking/eating times and live pickup availability.'); }
                 else if (action === 'help-order') {

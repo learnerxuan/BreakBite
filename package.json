@@ -1,6 +1,6 @@
 {
   "name": "breakbite",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Campus order-ahead with QR pickup, dietary information, saved meals and timetable planning",
@@ -15,7 +15,8 @@
     "test": "tsc -p tsconfig.test.json && node --test dist-tests/tests/*.test.js",
     "check": "npm run typecheck && npm test && npm run build",
     "seed:cloud": "node --env-file-if-exists=.env dist/server/seed-cloud.js",
-    "operator": "node --env-file-if-exists=.env dist/server/operator-cli.js"
+    "operator": "node --env-file-if-exists=.env dist/server/operator-cli.js",
+    "push:keys": "node --env-file-if-exists=.env scripts/push-keys.mjs"
   },
   "devDependencies": {
     "@types/node": "25.1.0",

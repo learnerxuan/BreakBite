@@ -22,3 +22,6 @@ body{margin:0;background:var(--bb-paper);color:var(--bb-ink);font-family:Inter,u
 .bb-qr svg{display:block;width:100%;height:auto}
 @media(max-width:900px){.bb-header{height:auto;min-height:92px;padding-top:10px;padding-bottom:8px}.bb-header nav{flex:1 0 100%}}
 @media(max-width:600px){.bb-meal p{font-size:12px;line-height:1.55}.bb-meal h3{font-size:16px}.bb-kitchen-name{font-size:11px}.bb-availability{font-size:11px}.bb-meal-body{padding:12px}.bb-quick-item>div{min-width:0;overflow-wrap:anywhere}}
+
+/* Dedicated availability and push preferences: preserve usable controls on narrow screens. */
+.bb-push-panel{margin-bottom:1.5rem;max-width:900px}.bb-push-panel h2{margin-top:.3rem}.bb-push-panel p{overflow-wrap:anywhere}.bb-push-panel details{margin-top:1rem}.bb-push-panel .bb-actions{flex-wrap:wrap;gap:.75rem}.bb-push-panel button:disabled{opacity:.55;cursor:not-allowed}.bb-header nav{overflow-x:auto;scrollbar-width:thin}.bb-header nav button{flex-shrink:0}.bb-load-card{min-width:0}.bb-load-timeline{overflow-x:auto}

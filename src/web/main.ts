@@ -1,6 +1,7 @@
+import { pushAction, refreshPush, pushFingerprint, detachPush } from './push-client.js';
 import { foodCheck, emptyProfile, type StudentProfile, type Notice, type BookingLoad } from '../shared/features.js';
 import { productActions, stopCamera } from './product-actions.js';
-import { personalView, productDialogs } from './views/personal.js';
+import { personalView, productDialogs, availabilityView } from './views/personal.js';
 import type { AppConfig, BasketGroup, BasketQuote, CheckoutResult, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
 import { api, ApiError, restore, signIn, signOut } from './client.js';
 import { initialState } from './state.js';
@@ -29,11 +30,12 @@ async function refresh(): Promise<void> {
         if(s.actor.role==='student') {
             const p=await api<{profile:StudentProfile;notices:Notice[]}>('/api/product/profile');
             const fresh=p.notices.filter(n=>!n.readAt&&!noticeIds.has(n.id));
-            if(noticesInitialised && fresh.length) { notify(fresh[0]!.message); if('Notification' in window && Notification.permission==='granted')try{new Notification('BreakBite pickup update',{body:fresh[0]!.message,tag:fresh[0]!.id});}catch{/* Inbox is the reliable fallback. */} }
+            if(noticesInitialised && fresh.length) notify(fresh[0]!.message); // OS alerts come only from the push worker, avoiding duplicates.
             noticesInitialised=true;noticeIds=new Set(p.notices.map(n=>n.id));s.profile=p.profile;s.notices=p.notices;
         } else {s.profile=emptyProfile();s.notices=[];}
     }
     else {const c=await api<{vendors:Vendor[];items:MenuItem[];loads:BookingLoad[]}>('/api/catalog');s.vendors=c.vendors;s.items=c.items;s.loads=c.loads;s.snapshot=null;s.profile=emptyProfile();s.notices=[];noticeIds.clear();noticesInitialised=false;}
+    if(s.view==='inbox') await refreshPush(s.actor);
     s.offline=false;
 }
 function authDialog(): string {
@@ -45,10 +47,13 @@ function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
     const student=s.actor?.role!=='vendor';
-    root.innerHTML=`<header class="bb-header"><a href="/" class="bb-brand" aria-label="BreakBite home"><span>b</span>BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}">Explore</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}">My orders</button><button data-view="saved" class="${s.view==='saved'?'active':''}">Saved</button><button data-view="planner" class="${s.view==='planner'?'active':''}">My planner</button><button data-view="inbox" class="${s.view==='inbox'?'active':''}">Inbox${s.notices.filter(n=>!n.readAt).length?` (${s.notices.filter(n=>!n.readAt).length})`:''}</button>`:''}`:'<span class="bb-kicker">KITCHEN WORKSPACE</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
+    root.innerHTML=`<header class="bb-header"><a href="/" class="bb-brand" aria-label="BreakBite home"><span>b</span>BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}">Explore</button><button data-view="availability" class="${s.view==='availability'?'active':''}">Availability</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}">My orders</button><button data-view="saved" class="${s.view==='saved'?'active':''}">Saved</button><button data-view="planner" class="${s.view==='planner'?'active':''}">My planner</button><button data-view="inbox" class="${s.view==='inbox'?'active':''}">Inbox${s.notices.filter(n=>!n.readAt).length?` (${s.notices.filter(n=>!n.readAt).length})`:''}</button>`:''}`:'<span class="bb-kicker">KITCHEN WORKSPACE</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
     ${s.offline?'<div class="bb-offline" role="status">Connection interrupted. Retrying… Your confirmed orders are saved. Do not submit a new checkout for an uncertain request.</div>':''}
     ${s.uncertain?'<div class="bb-pending" role="alert">Your last checkout needs confirmation. Keep the same request to avoid duplicate orders. <button class="bb-button secondary" data-action="retry-checkout">Check / retry original checkout</button></div>':''}
-    <main id="main" class="bb-main">${s.actor?.role==='vendor'?vendor(s):s.view==='orders'?orders(s):['saved','planner','inbox'].includes(s.view)?personalView(s):explore(s)}</main><footer class="bb-footer"><strong>BreakBite<span>Order ahead. Enjoy your break.</span></strong><span>For APU students · Independent student project · Pay at counter · Pickup estimates · MYT (UTC+8)</span></footer>${authDialog()}${checkoutDialog(s)}${menuDialog(s)}${productDialogs(s)}`;
+    <main id="main" class="bb-main">${s.actor?.role==='vendor'?vendor(s):s.view==='orders'?orders(s):s.view==='availability'?availabilityView(s):['saved','planner','inbox'].includes(s.view)?personalView(s):explore(s)}</main><footer class="bb-footer"><strong>BreakBite<span>Order ahead. Enjoy your break.</span></strong><span>For APU students · Independent student project · Pay at counter · Pickup estimates · MYT (UTC+8)</span></footer>${authDialog()}${checkoutDialog(s)}${menuDialog(s)}${productDialogs(s)}`;
+    const nav = root.querySelector<HTMLElement>('.bb-header nav');
+    const selected = nav?.querySelector<HTMLElement>('button.active');
+    if(nav && selected){const n=nav.getBoundingClientRect(),b=selected.getBoundingClientRect();if(b.left<n.left)nav.scrollLeft-=n.left-b.left;else if(b.right>n.right)nav.scrollLeft+=b.right-n.right;}
     for(const dialog of root.querySelectorAll<HTMLDialogElement>('dialog')) {
         dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
     }
@@ -101,8 +106,9 @@ const extra=productActions(s,{work,render,refresh,invalidate,notify});
 root.addEventListener('click',event=>{
     const target=(event.target as Element).closest<HTMLElement>('button');if(!target||s.busy)return;
     if(extra.click(target))return;
-    const action=target.dataset.action;const id=target.dataset.id??'';const vid=target.dataset.vendor??s.actor?.vendorId??'';
-    if(target.dataset.view){s.view=target.dataset.view as typeof s.view;if(s.view==='orders'&&!s.actor)s.auth='login';render();return;}
+    const action=target.dataset.action;
+    if(action?.startsWith('push-')){void work(async()=>{notify(await pushAction(action,target.dataset.id,s.actor));});return;}const id=target.dataset.id??'';const vid=target.dataset.vendor??s.actor?.vendorId??'';
+    if(target.dataset.view){s.view=target.dataset.view as typeof s.view;if(['orders','saved','planner','inbox'].includes(s.view)&&!s.actor)s.auth='login';render();if(s.view==='inbox')void refreshPush(s.actor).then(()=>render());return;}
     if(target.dataset.vendorTab){s.vendorTab=target.dataset.vendorTab as typeof s.vendorTab;render();return;}
     if(target.dataset.category){s.category=target.dataset.category;render();return;}
     if(action==='login'){s.auth='login';s.authError='';render();return;}
@@ -126,7 +132,7 @@ root.addEventListener('click',event=>{
     }
     if(!action)return;
     void work(async()=>{
-        if(action==='logout'){await signOut();s.actor=null;s.view='explore';s.cart=[];s.recovery={};s.success='';invalidate();await refresh();}
+        if(action==='logout'){await signOut();await detachPush().catch(()=>undefined);s.actor=null;s.view='explore';s.cart=[];s.recovery={};s.success='';invalidate();await refresh();}
         else if(action==='review')await review();
         else if(action==='retry-checkout')await sendAttempt();
         else if(action==='cancel'){
@@ -156,7 +162,7 @@ root.addEventListener('submit',event=>{
     if(form.id==='search-form'){s.search=String(f.get('search')??'');render();return;}
     void work(async()=>{
         if(form.id==='auth-form'){
-            s.actor=await signIn({email:f.get('email'),password:f.get('password'),...(s.auth==='register'?{name:f.get('name')}:{})},s.auth==='register');s.auth=null;s.authError='';s.view=s.actor.role==='vendor'?'vendor':'explore';await refresh();
+            s.actor=await signIn({email:f.get('email'),password:f.get('password'),...(s.auth==='register'?{name:f.get('name')}:{})},s.auth==='register');s.auth=null;s.authError='';s.view=s.actor.role==='vendor'?'vendor':new URLSearchParams(location.search).get('view')==='inbox'?'inbox':'explore';await refresh();await refreshPush(s.actor);
             notify('Signed in.');
         }else if(form.id==='plan-form'){
             if(s.uncertain)throw new Error('Confirm the original checkout before changing preferences.');
@@ -181,13 +187,16 @@ async function boot(): Promise<void> {
     try {
         s.config=await api<AppConfig>('/api/config');
         if(s.config.mode!=='local')throw new Error('This release uses AUTH_MODE=local and JSON storage. Cloud and Enterprise migration is deferred; see docs/LOCAL_MVP.md.');
-        s.actor=await restore();if(s.actor?.role==='vendor')s.view='vendor';await refresh();
+        s.actor=await restore();if(s.actor?.role==='vendor')s.view='vendor';else if(new URLSearchParams(location.search).get('view')==='inbox'){s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';}await refresh();await refreshPush(s.actor);
         if(attempt&&attempt.actorId===s.actor?.id){const prior=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(attempt.key)}`);if(prior.checkout){confirmed(prior.checkout);await refresh();}else s.uncertain=true;}
         render();
         setInterval(()=>{if(refreshing||s.busy||s.scanner)return;refreshing=true;
-            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads});
-            void refresh().then(()=>{const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads});const editing=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName??'');if(before!==after&&!editing&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}).catch(e=>{if(e instanceof ApiError&&e.status===401){s.actor=null;s.snapshot=null;s.auth='login';s.authError='Your session expired. Please sign in again.';render();}else{if(!s.offline){s.offline=true;if(!s.auth&&!s.quote&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}}}).finally(()=>refreshing=false);
+            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint()});
+            void refresh().then(()=>{const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint()});const editing=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName??'');if(before!==after&&!editing&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}).catch(e=>{if(e instanceof ApiError&&e.status===401){s.actor=null;s.snapshot=null;s.auth='login';s.authError='Your session expired. Please sign in again.';render();}else{if(!s.offline){s.offline=true;if(!s.auth&&!s.quote&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}}}).finally(()=>refreshing=false);
         },5000);
     }catch(e){root.innerHTML=`<main class="bb-empty"><h1>Unable to open BreakBite</h1><p>${esc(e instanceof Error?e.message:'Please restart the application.')}</p><a href="/" class="bb-button primary">Try again</a></main>`;}
 }
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
+    if(event.data?.type==='OPEN_INBOX'){if(s.actor?.role==='vendor')return;s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';void refreshPush(s.actor).then(()=>render());render();}
+});
 void boot();

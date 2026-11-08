@@ -1,3 +1,4 @@
+import { PushService, pushDigest } from './push.js';
 import { ProductService } from './product.js';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -32,8 +33,9 @@ async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
         throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.');
     }
 }
-export function createApp(config: Settings, service: MealService, db?: LocalDatabase) {
+export function createApp(config: Settings, service: MealService, db?: LocalDatabase, notificationService?: PushService) {
     const auth = new Auth(config);
+    const push = notificationService ?? (db ? new PushService(db) : undefined);
     const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
     const product = db ? new ProductService(db) : undefined;
     const checkout = db ? new CheckoutService(db) : undefined;
@@ -76,7 +78,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 res.writeHead(200, { 'Content-Type': pathname.endsWith('.png') ? 'image/png' : pathname.endsWith('.webp') ? 'image/webp' : 'image/jpeg', 'Cache-Control': 'public,max-age=86400' }); res.end(bytes); return;
             }
             if (pathname === '/healthz') {
-                json(res, 200, { ok: true, version: '0.3.0', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
+                json(res, 200, { ok: true, version: '0.3.1', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
                 return;
             }
             const key = req.socket.remoteAddress ?? 'unknown';
@@ -106,6 +108,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 return;
             }
             requireThat(!config.mcpOnly, 'NOT_FOUND', 'This service exposes MCP only.', 404);
+            if (pathname === '/api/push/config' && req.method === 'GET') { json(res, 200, push?.publicConfig() ?? { configured: false, publicKey: '' }); return; }
             if (pathname === '/api/config' && req.method === 'GET') {
                 json(res, 200, { mode: config.mode, firebaseApiKey: config.firebaseApiKey, enterpriseConfigured: !!config.agentAudience && Object.keys(config.agentEmails).length > 0, demoIdentities: config.mode === 'demo' ? DEMO_IDENTITIES : [] });
                 return;
@@ -132,6 +135,18 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
             if (pathname.startsWith('/api/')) {
                 const actor = accounts ? accounts.authorize(req) : await auth.user(req);
                 const method = req.method;
+                if (push && accounts && pathname.startsWith('/api/push/')) {
+                    requireThat(config.secureCookie || ['localhost', '127.0.0.1', '[::1]'].includes(new URL('http://' + req.headers.host).hostname), 'PUSH_HTTPS_REQUIRED', 'Background push requires HTTPS; localhost is the development exception.', 403);
+                    if (pathname === '/api/push/status' && method === 'GET') { json(res, 200, push.status(actor)); return; }
+                    requireThat(method === 'POST', 'METHOD_NOT_ALLOWED', 'Use POST.', 405);
+                    const input = await body(req, 8192);
+                    let result: unknown = { ok: true };
+                    if (pathname === '/api/push/subscribe') result = await push.subscribe(actor, input, pushDigest(accounts.session(req).session.csrfToken));
+                    else if (pathname === '/api/push/unsubscribe') await push.unsubscribe(actor, input);
+                    else if (pathname === '/api/push/test') result = await push.test(actor, input);
+                    else throw new AppError(404, 'NOT_FOUND', 'Push action not found.');
+                    json(res, 200, result); return;
+                }
                 if (product && pathname.startsWith('/api/product/')) {
                     const route = pathname.slice('/api/product/'.length);
                     if (route === 'profile' && method === 'GET') { await product.tick(); json(res, 200, product.profile(actor)); return; }
@@ -249,13 +264,14 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 filename = path.join(root, 'public/index.html');
             else if (/^\/(web|shared)\/[a-zA-Z0-9/_-]+\.(js|css)$/.test(pathname))
                 filename = path.join(root, pathname.slice(1));
-            else if (['/favicon.svg', '/manifest.webmanifest'].includes(pathname))
+            else if (['/favicon.svg', '/manifest.webmanifest', '/sw.js', '/icon-192.png', '/icon-512.png'].includes(pathname))
                 filename = path.join(root, 'public', pathname.slice(1));
             else
                 throw new AppError(404, 'NOT_FOUND', 'Page not found.');
+            if (pathname === '/sw.js') res.setHeader('Service-Worker-Allowed', '/');
             const content = await readFile(filename).catch(() => { throw new AppError(404, 'NOT_FOUND', 'Build the application before starting the server.'); });
             const extension = path.extname(filename);
-            const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+            const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
             res.writeHead(200, { 'Content-Type': types[extension] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
             res.end(req.method === 'HEAD' ? undefined : content);
         }
