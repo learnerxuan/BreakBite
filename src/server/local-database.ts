@@ -1,3 +1,5 @@
+import type { StudentProfile, Notice } from '../shared/features.js';
+import { isClosed, foodCheck } from '../shared/features.js';
 import { open, mkdir, readFile, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -17,7 +19,7 @@ export interface CheckoutRecord {
     orders: { vendorId: string; orderId: string }[];
 }
 export interface LocalData {
-    schemaVersion: 2; vendors: Record<string, VendorState>; accounts: LocalAccount[];
+    schemaVersion: 2; profiles?: Record<string, StudentProfile>; notices?: Notice[]; vendors: Record<string, VendorState>; accounts: LocalAccount[];
     sessions: Record<string, LocalSession>; checkouts: Record<string, CheckoutRecord>;
 }
 export const accountActor = (a: LocalAccount): Actor => ({ id: a.id, name: a.name, role: a.role, ...(a.vendorId ? { vendorId: a.vendorId } : {}) });
@@ -134,8 +136,9 @@ export class LocalStore implements Store {
     constructor(readonly db: LocalDatabase) {}
     async ids(): Promise<string[]> { return Object.keys(this.db.read().vendors); }
     async read(id: string): Promise<VendorState> {
-        const s = this.db.read().vendors[id];
+        const d = this.db.read(); const s = d.vendors[id];
         requireThat(s, 'NOT_FOUND', 'Kitchen not found.', 404);
+        for (const order of s.orders) if (!isClosed(order.status) && d.profiles?.[order.studentId]) order.dietary = structuredClone(d.profiles[order.studentId]!.preferences);
         return s;
     }
     async initialize(state: VendorState, replace = false): Promise<void> {
@@ -148,14 +151,25 @@ export class LocalStore implements Store {
             const s = d.vendors[id];
             requireThat(s, 'NOT_FOUND', 'Kitchen not found.', 404);
             const before = new Map(s.orders.map(o => [o.id, o.slotId]));
+            const lineVersions = new Map(s.orders.map(o => [o.id, JSON.stringify(o.lines)]));
+            for (const order of s.orders) if (!isClosed(order.status) && d.profiles?.[order.studentId]) order.dietary = structuredClone(d.profiles[order.studentId]!.preferences);
             const result = work(s);
             for (const order of s.orders) {
+                const preferences = d.profiles?.[order.studentId]?.preferences;
+                if (preferences && lineVersions.get(order.id) !== JSON.stringify(order.lines)) {
+                    for (const line of order.lines) {
+                        const item = s.items.find(i => i.id === line.itemId)!;
+                        const check = foodCheck(item.foodInfo, preferences);
+                        requireThat(check.suitable, 'DIETARY_CONFLICT', 'Current dietary restrictions do not match this replacement. ' + check.reasons.join(' '), 409);
+                    }
+                    order.dietary = structuredClone(preferences);
+                }
                 if (!order.checkoutId || before.get(order.id) === order.slotId) continue;
                 const checkout = Object.values(d.checkouts).find(c => c.id === order.checkoutId);
                 if (!checkout) continue;
                 const windows = checkout.orders.flatMap(ref => {
                     const state = d.vendors[ref.vendorId]; const child = state?.orders.find(o => o.id === ref.orderId);
-                    if (!child || ['cancelled', 'collected'].includes(child.status)) return [];
+                    if (!child || isClosed(child.status)) return [];
                     const slot = state!.slots.find(w => w.id === child.slotId);
                     requireThat(slot, 'INVARIANT', 'Missing pickup window.', 500); return [slot];
                 });

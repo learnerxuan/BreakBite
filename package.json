@@ -1,9 +1,9 @@
 {
   "name": "breakbite",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Order-ahead campus dining with multi-kitchen checkout and JSON persistence",
+  "description": "Campus order-ahead with QR pickup, dietary information, saved meals and timetable planning",
   "engines": {
     "node": ">=22.16.0"
   },

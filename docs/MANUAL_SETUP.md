@@ -18,4 +18,12 @@ The current product uses real local accounts and a JSON database. It does not ne
 - Payments: the current product records payment at each physical counter. Online processing/refunds are a separate integration.
 - Competition: the mandatory Gemini Enterprise requirement remains outstanding even though the JSON website runs independently.
 
-Do not deploy the old Firebase environment templates and assume the v0.2 frontend will work: it intentionally rejects non-local mode until that migration is tested.
+Do not deploy the old Firebase environment templates and assume the v0.3 frontend will work: it intentionally rejects non-local mode until that migration is tested.
+
+## v0.3 external acceptance
+
+- Supply actual vendor-reviewed APU menu data, photo permissions and dietary evidence; the code cannot independently obtain or certify these.
+- Test QR on an actual HTTPS phone/browser with native BarcodeDetector. Keep manual-code fallback for unsupported devices.
+- In-app reminders are implemented; closed-browser push/email/SMS needs separate delivery infrastructure.
+- Imported `.ics` schedules are snapshots, not a direct APSpace API integration.
+- Google and Gemini remain deferred. Public release needs HTTPS, private backups and account/permission review; committing code does not publish a running site.

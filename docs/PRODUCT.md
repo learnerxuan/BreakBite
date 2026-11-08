@@ -1,36 +1,34 @@
-# Product direction — v0.2
+# Product — v0.3
 
-## Fixed problem statement
+## Problem
 
-- Students using walk-up ordering wait to place orders and then wait for preparation after arriving.
-- They need a convenient way to browse and pre-order before arrival, regardless of whether their class break is short.
-- Example: order when appropriate before class ends, then collect afterwards; ordering from the library is equally valid.
-- Waiting-time improvements and campus demand still require real-world validation; no percentage benefit is claimed.
+- Students relying on walk-up ordering wait to order and then wait for preparation after reaching the stall.
+- Students need a convenient way to browse and order ahead, whether or not they have a short break.
+- Pre-orders still require realistic stock, kitchen workload and handover capacity.
+- Delays, unsuitable meals and unclear collection rules can undermine that convenience.
 
-## Implemented solution
+## Solution
 
-- Guest catalogue -> student signup/sign-in -> multi-kitchen basket -> per-kitchen pickup selection -> confirmed child orders.
-- Ordinary pre-ordering is the default. Fit my break is an optional helper, not a mandatory timetable gate.
-- One checkout can contain a meal from one kitchen and a drink from another.
-- All stock/capacity reservations succeed together, or no order is placed.
-- After checkout, kitchen orders prepare, cancel, collect and record payment independently.
-- Students track each kitchen and collect with its own code.
-- Merchants manage queues, prices, menu items, stock, location, availability and delays.
-- Local accounts and JSON data are persistent; this is not front-end-only mock state.
+- Browse menus, mix kitchens, choose pickup windows and confirm one atomic checkout.
+- Each kitchen prepares and fulfils its own child order; payment is recorded at that counter.
+- Use saved meals and reviewed dietary information to reduce repetitive choices.
+- Show online availability, provide clear cancellation/collection rules and QR handover.
+- Offer optional timetable planning and genuinely feasible deadline help, never queue-jumping tokens.
 
-## Operational boundaries
+## Implemented v0.3 scope
 
-- Pay each physical counter; no online payment gateway or refund is simulated as real.
-- Starter kitchens/menus are labelled sample data until reviewed/replaced by an operator.
-- Five kitchens per checkout/five portions per kitchen; two starter kitchens included.
-- Same-kitchen rule-based recovery requires operator approval and student acceptance.
-- Mixed-item child orders need manual recovery; no unsafe wholesale substitutions.
-- Mobile is the same responsive website, not a separate Android app.
+- QR display, merchant scan/lookup, explicit payment and one-use collection.
+- Favourites, recent meals, named usual baskets and current-data reorder review.
+- Editable campus/pickup details, menu source and local permission-confirmed photos.
+- Ingredients, spice, dietary/allergen warnings, unknown states and evidence references.
+- Online capacity timelines and next available pickup windows.
+- Configurable cutoffs/grace, durable reminders, overdue handling and no-show corrections.
+- Optional manual and preview-confirmed `.ics` timetable import.
+- Safe earlier-slot rescheduling and reviewed replacement requests.
 
-## Not implemented
+## Non-goals and evidence boundaries
 
-- Actual Gemini Enterprise runs or Google Cloud/Firebase migration for this release.
-- Offline ordering, delivery, group ordering, loyalty or complete timetable import.
-- Email verification, automatic email password resets, online payments and campus-wide production certification.
-
-See `LOCAL_MVP.md` for setup and `TEST_REPORT.md` for exact verification boundaries.
+- No physical-queue measurement, invented nutrition, certified allergy guarantees, automatic penalties or live APSpace sync.
+- No public deployment, Google migration or actual Gemini Enterprise execution claimed.
+- Current menus remain samples until replaced/reviewed with vendors. Being APU-focused does not imply university endorsement.
+- Waiting-time reduction is the intended benefit, not a measured percentage.

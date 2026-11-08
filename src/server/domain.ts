@@ -1,3 +1,6 @@
+import { foodCheck, isClosed } from '../shared/features.js';
+import { parseFoodInfo, foodRevision } from './food.js';
+import { policies, parsePolicy, delayedCancellation } from './policy.js';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Actor, BreakPlan, MealPlan, MenuItem, Order, OrderLine, Proposal, PublicOrder, Quote, RecoveryOption, Selection, Slot, Snapshot, VendorState } from '../shared/model.js';
 import { atRisk } from '../shared/model.js';
@@ -7,7 +10,7 @@ import { seedVendor } from './seed.js';
 const MINUTE = 60000;
 const stamp = (n: number) => new Date(n).toISOString();
 const live = (o: Order) => o.status === 'confirmed' || o.status === 'preparing';
-const terminal = (o: Order) => o.status === 'collected' || o.status === 'cancelled';
+const terminal = (o: Order) => isClosed(o.status);
 function operator(actor: Actor, vendorId: string, allowAgent = false): void {
     requireThat((actor.role === 'vendor' || (allowAgent && actor.role === 'agent')) && actor.vendorId === vendorId, 'FORBIDDEN', 'This action belongs to the vendor operator.', 403);
 }
@@ -45,7 +48,7 @@ function linesFor(s: VendorState, selection: Selection[]): {
     items: MenuItem[];
 } {
     const items = selection.map(x => { const item = s.items.find(i => i.id === x.itemId); requireThat(item, 'NOT_FOUND', 'Menu item not found at this vendor.', 404); return item; });
-    return { items, lines: selection.map((x, i) => ({ ...x, name: items[i]!.name, unitPriceSen: items[i]!.priceSen, prepUnits: items[i]!.prepUnits })) };
+    return { items, lines: selection.map((x, i) => ({ ...x, name: items[i]!.name, unitPriceSen: items[i]!.priceSen, prepUnits: items[i]!.prepUnits, ...(items[i]!.foodInfo ? { foodInfo: structuredClone(items[i]!.foodInfo) } : {}) })) };
 }
 function delay(s: VendorState, itemId: string): number { return s.incidents.filter(i => i.active && (!i.itemIds.length || i.itemIds.includes(itemId))).reduce((n, i) => n + i.delayMinutes, 0); }
 function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan, now: number): Quote {
@@ -65,7 +68,7 @@ function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan,
         reasons.push('Some items are sold out or have insufficient stock.');
     if (latest <= earliest)
         reasons.push('Your break does not leave enough time to walk, collect and eat.');
-    const slots = reasons.length ? [] : s.slots.filter(x => Date.parse(x.startAt) >= earliest && Date.parse(x.endAt) <= latest && Date.parse(x.endAt) >= ready && Date.parse(x.startAt) > now && x.reservedUnits + units <= x.kitchenCapacity && x.reservedHandovers + 1 <= x.pickupCapacity);
+    const slots = reasons.length ? [] : s.slots.filter(x => Date.parse(x.startAt) >= earliest && Date.parse(x.endAt) <= latest && Date.parse(x.endAt) >= ready && Date.parse(x.startAt) - policies(s.vendor).cutoffMinutes * MINUTE > now && x.reservedUnits + units <= x.kitchenCapacity && x.reservedHandovers + 1 <= x.pickupCapacity);
     if (!slots.length && !reasons.length)
         reasons.push('No pickup window fits the current preparation time and available capacity. Choose another time or meal.');
     return { vendorId: s.vendor.id, totalSen, earliestPickupAt: stamp(earliest), latestPickupAt: stamp(latest), slots: structuredClone(slots), reasons };
@@ -108,8 +111,8 @@ function checkProposal(s: VendorState, id: string, now: number): {
     requireThat(proposal.orderVersion === order.version && order.status === 'confirmed', 'STALE_PROPOSAL', 'The order changed. Request a fresh recovery proposal.', 409);
     return { proposal, order };
 }
-function safeOrder(order: Order, actor: Actor): PublicOrder {
-    const { pickupCode, collectionFailures: _failures, collectionLockedUntil: _locked, ...rest } = order;
+export function safeOrder(order: Order, actor: Actor): PublicOrder {
+    const { pickupCode, qrToken: _qr, collectionFailures: _failures, collectionLockedUntil: _locked, ...rest } = order;
     return actor.role === 'student' && actor.id === order.studentId && !terminal(order) ? { ...rest, pickupCode } : rest;
 }
 export class MealService {
@@ -160,6 +163,7 @@ export class MealService {
                 id: randomUUID(), studentId: actor.id, vendorId, lines, totalSen: quote.totalSen, slotId,
                 plan, latestPickupAt: 'nextClassAt' in plan ? quote.latestPickupAt : slot.endAt, earliestPickupAt: quote.earliestPickupAt,
                 estimatedReadyAt: slot.endAt, status: 'confirmed', version: 1,
+                policy: policies(s.vendor), promisedPickupEndAt: slot.endAt, cancelBeforeAt: stamp(Date.parse(slot.startAt) - policies(s.vendor).cancellationMinutes * MINUTE),
                 pickupCode: randomBytes(5).toString('hex').toUpperCase(), createdAt: stamp(now), updatedAt: stamp(now),
                 collectionFailures: 0, collectionLockedUntil: null, payment: this.payment, ...(this.payment === 'pay_at_pickup' ? { paymentStatus: 'unpaid' as const } : {}),
             };
@@ -174,12 +178,16 @@ export class MealService {
         await this.store.transact(vendorId, s => {
             const order = getOrder(s, orderId);
             requireThat(order.studentId === actor.id, 'NOT_FOUND', 'Order not found.', 404);
-            requireThat(order.status === 'confirmed', 'ALREADY_PREPARING', 'You can cancel only before preparation starts. Contact the vendor.', 409);
-            release(s, order);
+            const late = delayedCancellation(order, this.clock());
+            requireThat(late || (order.status === 'confirmed' && (!order.cancelBeforeAt || this.clock() < Date.parse(order.cancelBeforeAt))), 'CANCELLATION_LOCKED', 'The normal cancellation deadline has passed or preparation started. A vendor-late order remains eligible for cancellation.', 409);
+            if (order.status === 'confirmed') release(s, order);
+            // Prepared ingredients/workload are not restored. The counter reservation is historical.
+            order.closedReason = late ? 'vendor_delay' : 'student_cancelled';
+            order.pickupCode = ''; order.qrToken = '';
             order.status = 'cancelled';
             touch(order, this.clock());
             invalidate(s, order.id);
-            audit(s, actor, 'order.cancelled', order.id, 'Unprepared stock and reservations released. No online payment was taken.', this.clock());
+            audit(s, actor, 'order.cancelled', order.id, 'Cancellation recorded. Prepared ingredients are not restocked. No student strike or online refund.', this.clock());
         });
     }
     async changeStatus(actor: Actor, vendorId: string, orderId: string, input: unknown): Promise<void> {
@@ -189,8 +197,13 @@ export class MealService {
             const order = getOrder(s, orderId);
             requireThat((order.status === 'confirmed' && status === 'preparing') || (order.status === 'preparing' && status === 'ready'), 'INVALID_TRANSITION', 'Orders must move confirmed → preparing → ready → verified collection.', 409);
             order.status = status as 'preparing' | 'ready';
-            if (status === 'ready')
-                order.estimatedReadyAt = stamp(this.clock());
+            if (status === 'ready') {
+                order.readyAt = stamp(this.clock());
+                order.estimatedReadyAt = order.readyAt;
+                order.vendorDelayed = order.vendorDelayed || delayedCancellation(order, this.clock());
+                const slotEnd = Date.parse(getSlot(s, order.slotId).endAt);
+                order.collectionDueAt = stamp(Math.max(slotEnd, this.clock()) + (order.policy ?? policies(s.vendor)).holdMinutes * MINUTE);
+            }
             touch(order, this.clock());
             invalidate(s, order.id);
             audit(s, actor, `order.${status}`, order.id, 'Operator updated preparation status.', this.clock());
@@ -221,7 +234,7 @@ export class MealService {
             requireThat(order.payment !== 'pay_at_pickup' || body.paymentReceived === true, 'PAYMENT_REQUIRED', 'Confirm payment was received at this counter before completing collection.', 409);
             if (order.payment === 'pay_at_pickup') { order.paymentStatus = 'paid'; order.paidAt = stamp(now); }
             order.status = 'collected';
-            order.pickupCode = '';
+            order.pickupCode = ''; order.qrToken = '';
             touch(order, now);
             invalidate(s, order.id);
             audit(s, actor, 'order.collected', order.id, 'One-time pickup credential consumed.', now);
@@ -262,7 +275,12 @@ export class MealService {
             s.vendor.name = text(b.name, 'Kitchen name', 2, 60);
             s.vendor.location = text(b.location, 'Pickup location', 2, 120);
             s.vendor.description = text(b.description, 'Description', 2, 240);
-            if (b.confirmMenu === true) s.vendor.synthetic = false;
+            if (b.campus !== undefined) s.vendor.campus = text(b.campus, 'Campus', 0, 100);
+            if (b.policies !== undefined) s.vendor.policies = parsePolicy(b.policies);
+            if (b.confirmMenu === true) {
+                s.vendor.menuSource = text(b.menuSource, 'Vendor verification source / contact role', 5, 240);
+                s.vendor.menuReviewedAt = stamp(this.clock()); s.vendor.synthetic = false;
+            }
             audit(s, actor, 'vendor.profile', vendorId, 'Profile updated; menu verification is the operator responsibility.', this.clock());
         });
     }
@@ -278,6 +296,7 @@ export class MealService {
     }
     async addItem(actor: Actor, vendorId: string, input: unknown): Promise<MenuItem> {
         operator(actor, vendorId); const fields = this.menuFields(input);
+        const food = object(input).foodInfo; if (food !== undefined) { fields.foodInfo = parseFoodInfo(food, actor.id, this.clock()); fields.allergens = fields.foodInfo.allergensKnown ? fields.foodInfo.allergens : null; fields.tags = fields.foodInfo.diets; }
         return this.store.transact(vendorId, s => {
             requireThat(s.items.length < 100, 'MENU_LIMIT', 'This kitchen supports at most 100 menu items.', 409);
             const item = { ...fields, id: randomUUID(), vendorId }; s.items.push(item);
@@ -292,7 +311,12 @@ export class MealService {
         requireThat(fields || enabled !== undefined || stock !== undefined, 'INVALID_INPUT', 'Provide menu details, enabled or stock.');
         await this.store.transact(vendorId, s => {
             const item = s.items.find(x => x.id === itemId); requireThat(item, 'NOT_FOUND', 'Item not found.', 404);
-            if (fields) Object.assign(item, fields);
+            if (fields) {
+                const previous = item.foodInfo; Object.assign(item, fields); item.foodInfo = previous;
+                if (b.foodInfo !== undefined) item.foodInfo = parseFoodInfo(b.foodInfo, actor.id, this.clock());
+                item.allergens = item.foodInfo?.allergensKnown ? item.foodInfo.allergens : null;
+                item.tags = item.foodInfo?.diets ?? [];
+            }
             if (enabled !== undefined) item.enabled = enabled;
             if (stock !== undefined) item.stock = stock;
             audit(s, actor, 'menu.updated', itemId, 'Available, unreserved stock and menu details updated; confirmed order prices are unchanged.', this.clock());
@@ -304,6 +328,7 @@ export class MealService {
             const estimate = stamp(Date.parse(getSlot(s, order.slotId).endAt) + minutes * MINUTE);
             if (estimate !== order.estimatedReadyAt) {
                 order.estimatedReadyAt = estimate;
+                if (delayedCancellation(order, this.clock())) order.vendorDelayed = true;
                 touch(order, this.clock());
                 invalidate(s, order.id);
             }
@@ -337,7 +362,7 @@ export class MealService {
     }
     private options(s: VendorState, orderId: string): RecoveryOption[] {
         const order = getOrder(s, orderId);
-        if (order.status !== 'confirmed' || !atRisk(order) || ('nextClassAt' in order.plan && Date.parse(order.latestPickupAt) <= this.clock()))
+        if (order.status !== 'confirmed' || (!atRisk(order) && !order.assistanceRequested) || ('nextClassAt' in order.plan && Date.parse(order.latestPickupAt) <= this.clock()))
             return [];
         const copy = structuredClone(s);
         const saved = getOrder(copy, orderId);
@@ -347,13 +372,13 @@ export class MealService {
         const quantity = order.lines.reduce((n, x) => n + x.quantity, 0);
         const options: RecoveryOption[] = [];
         for (const item of copy.items) {
-            if (order.lines.some(x => x.itemId === item.id) || (item.category === 'Drinks') !== (original.category === 'Drinks'))
+            if ((order.dietary && !foodCheck(item.foodInfo, order.dietary, this.clock()).suitable) || order.lines.some(x => x.itemId === item.id) || (item.category === 'Drinks') !== (original.category === 'Drinks'))
                 continue;
             // No hidden charge: alternatives may not cost more than the original simulated total.
             const plan = { ...order.plan, budgetSen: Math.min(order.totalSen, order.plan.budgetSen) };
             const quote = calculateQuote(copy, [{ itemId: item.id, quantity }], plan, this.clock());
-            for (const slot of quote.slots.slice(0, 3))
-                options.push({ itemId: item.id, itemName: item.name, quantity, totalSen: quote.totalSen, slotId: slot.id, readyAt: slot.endAt, allergens: item.allergens });
+            for (const slot of quote.slots.filter(w => !order.assistanceRequested || w.endAt < order.estimatedReadyAt).slice(0, 3))
+                options.push({ itemId: item.id, itemName: item.name, quantity, totalSen: quote.totalSen, slotId: slot.id, readyAt: slot.endAt, allergens: item.allergens, foodInfo: item.foodInfo ? structuredClone(item.foodInfo) : undefined, foodRevision: foodRevision(item.foodInfo) });
         }
         return options.sort((a, b) => a.readyAt.localeCompare(b.readyAt) || a.totalSen - b.totalSen).slice(0, 12);
     }
@@ -367,8 +392,19 @@ export class MealService {
         const options = this.options(s, orderId);
         return { options, message: options.length ? 'Verified candidates; stock and capacity are not reserved until student acceptance.' : order.status !== 'confirmed' ? 'Preparation has started or the order is closed. Arrange any exception with the student manually.' : 'No safe, same-vendor alternative fits. Do not promise a rescue; discuss waiting or eligible cancellation.' };
     }
+    async requestAssistance(actor: Actor, vendorId: string, orderId: string) {
+        student(actor);
+        await this.store.transact(vendorId, s => {
+            const o = getOrder(s, orderId); requireThat(o.studentId === actor.id, 'NOT_FOUND', 'Order not found.', 404);
+            requireThat(o.status === 'confirmed', 'ALREADY_PREPARING', 'The kitchen has started preparing or closed this order. Discuss vendor delays at the counter.', 409);
+            o.assistanceRequested = true;
+            audit(s, actor, 'assistance.requested', o.id, 'Faster alternatives requested; no queue priority or displacement.', this.clock());
+        });
+        const s = await this.store.read(vendorId);
+        return { options: this.options(s, orderId), message: 'Only available stock/capacity is considered. Alternatives still need kitchen approval and your consent.' };
+    }
     async createProposal(actor: Actor, vendorId: string, input: unknown): Promise<Proposal> {
-        operator(actor, vendorId, true);
+        if (actor.role !== 'student') operator(actor, vendorId, true);
         const b = object(input);
         const orderId = text(b.orderId, 'Order ID');
         const itemId = text(b.itemId, 'Item ID');
@@ -376,13 +412,14 @@ export class MealService {
         const reason = text(b.reason ?? 'Alternative evaluated against the student deadline and live capacity.', 'Reason', 3, 240);
         return this.store.transact(vendorId, s => {
             const order = getOrder(s, orderId);
+            if (actor.role === 'student') requireThat(order.studentId === actor.id && order.assistanceRequested, 'NOT_FOUND', 'Request assistance for your own order first.', 404);
             const now = this.clock();
             const option = this.options(s, orderId).find(x => x.itemId === itemId && x.slotId === slotId);
             requireThat(option, 'UNAVAILABLE_ALTERNATIVE', 'This alternative no longer fits the order.', 409);
-            const existing = s.proposals.find(p => p.orderId === orderId && p.orderVersion === order.version && p.option.itemId === itemId && p.option.slotId === slotId && ['pending_vendor', 'approved'].includes(p.status) && Date.parse(p.expiresAt) > now);
+            const existing = s.proposals.find(p => p.orderId === orderId && p.orderVersion === order.version && p.option.itemId === itemId && p.option.slotId === slotId && p.option.foodRevision === option.foodRevision && ['pending_vendor', 'approved'].includes(p.status) && Date.parse(p.expiresAt) > now);
             if (existing)
                 return existing;
-            const proposal: Proposal = { id: randomUUID(), orderId, orderVersion: order.version, vendorId, studentId: order.studentId, option, reason, status: 'pending_vendor', createdAt: stamp(now), expiresAt: stamp(Math.min(now + 5 * MINUTE, Date.parse(option.readyAt))), source: actor.role === 'agent' ? 'mcp' : 'manual' };
+            const proposal: Proposal = { id: randomUUID(), orderId, orderVersion: order.version, vendorId, studentId: order.studentId, option, reason, status: 'pending_vendor', createdAt: stamp(now), expiresAt: stamp(Math.min(now + 5 * MINUTE, Date.parse(option.readyAt))), source: actor.role === 'student' ? 'student' : actor.role === 'agent' ? 'mcp' : 'manual' };
             s.proposals.push(proposal);
             audit(s, actor, 'proposal.created', proposal.id, 'Pending operator approval; no stock reserved.', now);
             return proposal;
@@ -411,8 +448,8 @@ export class MealService {
                 audit(s, actor, 'proposal.declined', id, 'Original order unchanged.', this.clock());
                 return;
             }
-            const option = this.options(s, order.id).find(x => x.itemId === proposal.option.itemId && x.slotId === proposal.option.slotId && x.totalSen === proposal.option.totalSen);
-            requireThat(option, 'UNAVAILABLE_ALTERNATIVE', 'Stock, capacity or timing changed. Your original order is unchanged.', 409);
+            const option = this.options(s, order.id).find(x => x.itemId === proposal.option.itemId && x.slotId === proposal.option.slotId && x.totalSen === proposal.option.totalSen && (x.foodRevision ?? '') === (proposal.option.foodRevision ?? ''));
+            requireThat(option, 'UNAVAILABLE_ALTERNATIVE', 'Stock, ingredients, capacity or timing changed. Ask the kitchen for an updated proposal; your original order is unchanged.', 409);
             release(s, order);
             const { lines } = linesFor(s, [{ itemId: option.itemId, quantity: option.quantity }]);
             reserve(s, lines, option.slotId);
@@ -422,6 +459,9 @@ export class MealService {
             order.estimatedReadyAt = option.readyAt;
             if (!('nextClassAt' in order.plan)) order.latestPickupAt = option.readyAt;
             order.pickupCode = randomBytes(5).toString('hex').toUpperCase();
+            order.qrToken = '';
+            order.promisedPickupEndAt = option.readyAt; order.cancelBeforeAt = stamp(Date.parse(getSlot(s, order.slotId).startAt) - (order.policy ?? policies(s.vendor)).cancellationMinutes * MINUTE);
+            order.vendorDelayed = false;
             order.collectionFailures = 0;
             order.collectionLockedUntil = null;
             touch(order, this.clock());

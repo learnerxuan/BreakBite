@@ -109,13 +109,13 @@ test('cancellation restores unprepared stock and both reservations exactly once'
     assert.equal(s.items[0]!.stock, 20);
     assert.equal(s.slots[0]!.reservedUnits, 0);
     assert.equal(s.slots[0]!.reservedHandovers, 0);
-    await assert.rejects(f.service.cancel(alex, 'bowl-lab', o.id), errorCode('ALREADY_PREPARING'));
+    await assert.rejects(f.service.cancel(alex, 'bowl-lab', o.id), errorCode('CANCELLATION_LOCKED'));
 });
 test('preparing food cannot be cancelled and silently restocked', async () => {
     const f = await fixture();
     const o = await f.order();
     await f.service.changeStatus(vendor, 'bowl-lab', o.id, { status: 'preparing' });
-    await assert.rejects(f.service.cancel(alex, 'bowl-lab', o.id), errorCode('ALREADY_PREPARING'));
+    await assert.rejects(f.service.cancel(alex, 'bowl-lab', o.id), errorCode('CANCELLATION_LOCKED'));
     assert.equal((await f.store.read('bowl-lab')).items[0]!.stock, 19);
 });
 test('cross-student, cross-vendor and agent privilege escalation fail', async () => {

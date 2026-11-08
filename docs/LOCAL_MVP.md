@@ -1,4 +1,4 @@
-# Local product guide — v0.2
+# Local product guide — v0.3
 
 ## Start here
 
@@ -19,7 +19,7 @@
 6. Operators replace the sample menu information, prices, preparation times and pickup location in their workspace.
 7. Operators confirm the menu has been reviewed in Kitchen settings; this removes that kitchen's sample label. This is operator acknowledgement, not independent verification.
 
-Allergen information is unknown in this release. Discuss dietary needs directly with the kitchen; do not add unsupported certification claims.
+Starter allergen information is unknown. Operators can now supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
 
 ## Main flow
 
@@ -28,8 +28,8 @@ Allergen information is unknown in this release. Discuss dietary needs directly 
 - Set a realistic walking time between counters. One minute per handover is also reserved in the itinerary check.
 - Confirm once. All child reservations either succeed together or fail together.
 - View the checkout in My orders, with an individual status/code/amount for each kitchen.
-- Kitchens prepare independently. The student pays each counter separately; the operator enters the student's code and confirms payment received.
-- Cancel each child independently before it enters preparation. No online charge/refund is performed.
+- Kitchens prepare independently. The student pays each counter separately; the operator scans the student's QR or enters the fallback code, then confirms payment received and handover.
+- Cancel each child independently before preparation and its agreed cancellation cutoff. Qualifying vendor delays allow an exception without a no-show penalty. No online charge/refund is performed.
 
 ## Delay and recovery
 
@@ -75,7 +75,7 @@ COOKIE_SECURE=false
 - `.data/database.json` is the current database; `database.previous.json` is the immediately previous snapshot.
 - Accounts and orders survive process/browser restarts. Sessions expire after 12 hours or logout/reset.
 - The server takes a lock on the data directory; only one process may use it. This is not distributed storage.
-- Take a separate backup with the server stopped before changing versions or restoring data. Both files contain sensitive account/order data and must stay private.
+- Take a separate backup of the entire data directory (including `media/`) with the server stopped before changing versions or restoring data. Both files contain sensitive account/order data and must stay private.
 - Restore only a checked backup while stopped. A malformed current database fails closed; it is never silently replaced with sample data.
 - For a clean review installation, use a new `DATA_DIR`, rather than deleting another person's data.
 - A dead same-host process lock is recovered at startup; unknown/ambiguous locks require checking the process first. Never delete a live server's lock.
@@ -104,3 +104,13 @@ COOKIE_SECURE=false
 - Set `ALLOWED_ORIGINS` explicitly. Public use requires HTTPS at a trusted reverse proxy and secure cookies.
 - Do not run multiple container replicas against the same file directory.
 - The Node/npm path above is the tested setup, not a claim that container networking has been verified.
+
+## v0.3 operational notes
+
+- Upgrade preserves v0.2 accounts/orders; new profile/notice fields are added as used. Back up before upgrading.
+- Camera scanning requires HTTPS and a supported native QR detector. HTTP LAN browsing is not a camera acceptance test. Manual code and USB-scanner text remain usable.
+- Reminders are created by the running server every 15 seconds, independently of browser activity. Read the durable Inbox; device notifications only work while the site is open with permission.
+- Ready too early does not shorten the booked grace period. Overdue food is not restocked automatically; merchants must confirm an uncollected closure.
+- Save preferences, favourites/usual orders and optional timetables through the student pages. Imported calendars are private snapshots, not APSpace live sync.
+- Photos are saved locally in `.data/media/`. The source repository must never contain private data or unauthorised photographs.
+- Public hosting and closed-browser push delivery are not completed by running the local server.

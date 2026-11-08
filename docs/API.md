@@ -1,73 +1,78 @@
-# HTTP API — local product v0.2
+# HTTP API — v0.3
 
-- Base: the same origin as the website.
-- JSON bodies; prices are integer MYR sen; timestamps are ISO with timezone.
-- Session cookie `bb_session` is HttpOnly. Mutation requests need `X-CSRF-Token` returned by login/session.
-- All routes enforce origin/host checks. Do not log credentials, cookies or pickup codes.
+## Authentication and validation
 
-## Public / identity
+- Same-origin JSON API. Use local HttpOnly session cookies; authenticated mutations require `X-CSRF-Token`.
+- Roles, prices, stock, capacity, order ownership and vendor scope are server-authoritative.
+- Errors: `{ "error": { "code": "...", "message": "..." } }` with an appropriate HTTP status.
+- `GET /api/catalog` is public. `GET /api/session` returns the current actor and in-memory CSRF token.
+- `POST /api/auth/register`, `/api/auth/login`, `/api/auth/logout` manage local accounts/sessions. Vendor provisioning remains a server-side CLI action.
 
-| Route | Purpose |
+## Existing ordering routes
+
+| Method / route | Purpose |
 | --- | --- |
-| `GET /api/config` | Current runtime mode; no demo identities in local mode. |
-| `GET /api/catalog` | Public menus and kitchen profiles, no orders or accounts. |
-| `POST /api/auth/register` | `{ name, email, password }`; student role only. |
-| `POST /api/auth/login` | `{ email, password }`; sets cookie and returns actor/CSRF token. |
-| `GET /api/session` | Current actor and CSRF token; 401 if expired. |
-| `POST /api/auth/logout` | Revoke the cookie session; requires CSRF token. |
-| `GET /api/state` | Catalogue plus only the caller's orders/proposals/operator data. |
+| `GET /api/state` | Scoped orders, menus, slots, incidents, proposals and operation history. |
+| `POST /api/checkout/quote` | Current totals, usable slots, dietary reasons and food-review fingerprints. |
+| `POST /api/checkouts` | Atomic multi-kitchen checkout; `Idempotency-Key` required. |
+| `GET /api/checkouts/:key` | Recover the current student's existing checkout after a lost response. |
+| `POST /api/vendors/:vendor/orders/:id/cancel` | Eligible owner cancellation, including qualifying vendor delay. |
+| `POST /api/vendors/:vendor/orders/:id/status` | Merchant preparation transition. |
+| `POST /api/vendors/:vendor/orders/:id/collect` | Merchant manual-code collection with `paymentReceived:true`. |
+| `PATCH /api/vendors/:vendor/profile` | Name, campus, pickup location, source acknowledgement and future-order policies. |
+| `POST/PATCH /api/vendors/:vendor/items[/:id]` | Create/edit menu information; reviewed `foodInfo` is optional on partial updates. |
+| `POST /api/vendors/:vendor/slots` | Open rolling windows using configured online capacity. |
+| `POST /api/vendors/:vendor/incidents` | Report delay. |
+| `POST /api/vendors/:vendor/incidents/:id/resolve` | Resolve delay. |
+| `POST /api/vendors/:vendor/recovery/evaluate` | Merchant/agent checks valid alternatives. |
+| `POST /api/vendors/:vendor/proposals` | Create pending proposal. Students can request only for their own assistance-marked order. |
+| `POST /api/vendors/:vendor/proposals/:id/approve` | Merchant approval/rejection. |
+| `POST /api/vendors/:vendor/proposals/:id/respond` | Owning student consent/rejection and fresh atomic validation. |
 
-## Multi-kitchen checkout
+- Quote body: `{groups:[{vendorId,items:[{itemId,quantity}]}],plan}`.
+- Checkout adds a `slotId` for every group, `transferMinutes`, `expectedTotalSen` and the `menuVersions` map returned by quote.
+- `plan` is `{mode:'pickup',budgetSen}` or the optional break-time contract. No fake class time is required.
+- Food changes invalidate old reviews, even when two changes share a timestamp.
+- Submissions preserve independent child codes, fulfilment and payment recording; no online payment is processed.
 
-`POST /api/checkout/quote`:
+## v0.3 product routes
 
-```json
-{
-  "groups": [
-    { "vendorId": "bowl-lab", "items": [{ "itemId": "chicken-rice", "quantity": 1 }] },
-    { "vendorId": "noodle-co", "items": [{ "itemId": "lemon-water", "quantity": 1 }] }
-  ],
-  "plan": { "mode": "pickup", "budgetSen": 50000 }
-}
-```
+All below require a session. GET routes do not mutate user settings; all action routes use POST plus CSRF.
 
-- Response: per-kitchen quotes/slots, combined total, blocking reasons.
-- `POST /api/checkouts`: same payload, with a `slotId` inside each group, `transferMinutes`, and `expectedTotalSen`.
-- Include a unique `Idempotency-Key` header. Keep it and the exact payload for retries.
-- All-or-nothing: an unavailable kitchen, price change, budget failure or conflicting pickup itinerary commits no child orders.
-- Response: `{ id, orders, totalSen }`; each child has a vendor, code, status and payment terms.
-- `GET /api/checkouts/:key`: `{ checkout: result | null }`, scoped to the authenticated student. Null does not authorize creating a new request while an earlier request is in flight; retry the original key.
-- Legacy `POST /api/orders` is rejected in local mode so clients cannot bypass the combined-checkout checks.
+| Route after `/api/product/` | Method | Body / response |
+| --- | --- | --- |
+| `profile` | GET | Own `{profile,notices}`; student only. |
+| `loads` | GET | Current online kitchen/counter loads, timestamps and next available windows. |
+| `preferences` | POST | `{diets,avoid,hideUnsuitable}`. |
+| `favourite` | POST | `{itemId,saved:boolean}`; up to 100. |
+| `usual` | POST | Create `{name,lines:[{vendorId,itemId,quantity}]}`, rename `{id,name}`, or remove `{id,remove:true}`; up to 20 baskets. |
+| `reorder` | POST | `{usualId}` or `{checkoutId}` -> current `{basket,warnings}`; no order creation. |
+| `notices/read` | POST | Mark the current student's notices read. |
+| `timetable/manual` | POST | `{title,location,startAt,endAt,weeks}`; ISO timestamps, 1–13 weeks. |
+| `timetable/preview` | POST | `{content}` (.ics text, max 256 KB) -> owned, expiring preview. |
+| `timetable/confirm` | POST | `{previewId,ids,replaceImported}`; selected preview IDs only. |
+| `timetable/delete` | POST | `{id}` or `{all:true}`. |
+| `pickup/qr` | POST | `{vendorId,orderId}` -> private owner-only `{payload}`. |
+| `pickup/resolve` | POST | Merchant `{payload}` -> own ready order, without pickup secrets. |
+| `pickup/collect` | POST | Merchant `{payload,paymentReceived:true}` -> atomic handover. |
+| `uncollected` | POST | Merchant `{orderId,reason}` after grace; no restock or automatic penalty. |
+| `no-show/correct` | POST | Merchant `{orderId,reason}` clears an incorrect no-show record. |
+| `earlier/options` | POST | Owner `{vendorId,orderId}` -> available earlier slots and explanation. |
+| `earlier/confirm` | POST | Owner `{vendorId,orderId,slotId}` -> revalidated reservation; no displacement. |
+| `assistance` | POST | Owner `{vendorId,orderId}` -> valid faster alternatives; no automatic change. |
+| `photo` | POST | Merchant `{itemId,data:base64,credit,permission:true}` or `{itemId,remove:true}`. |
 
-Optional `plan` uses the earlier break fields: `breakStartAt`, `nextClassAt`, `walkToMinutes`, `eatMinutes`, `returnMinutes`, `bufferMinutes`, `budgetSen`. Normal pickup requires none of those time fields.
+Photos are served by exact hashed raster paths under `/media/`. Input bytes are capped at 2 MB; HTML/SVG and arbitrary filenames/URLs are rejected.
 
-## Kitchen/order actions
+## Food and policy contracts
 
-All routes below start with `/api/vendors/:vendorId/`.
+- `foodInfo`: ingredients, `allergensKnown`, `allergens`, `mayContain`, `diets`, `spice`, optional halal/gluten-free evidence `{reference,expiresOn}`, and `confirmed:true`.
+- The server adds `reviewedBy/reviewedAt`. Evidence is vendor-provided, not a certification by the app.
+- Enumerations are in `src/shared/features.ts`. Unknown information does not satisfy an active restriction.
+- Vendor `policies`: `cutoffMinutes`, `cancellationMinutes`, `holdMinutes`, `delayGraceMinutes`.
+- Each new order snapshots its policy and food review. Ready/overdue notices are server-generated and privately stored.
+- A historical order, not a current menu entry, is the source of its original sold-item/ingredient snapshot.
 
-| Route | Who / body |
-| --- | --- |
-| `PATCH profile` | Own operator: name, location, description; optional confirmMenu acknowledgement. |
-| `PATCH open` | Own operator: `{ open }`. |
-| `POST items` | Own operator: complete menu fields. |
-| `PATCH items/:id` | Own operator: stock/enabled, or complete menu fields. |
-| `POST slots` | Own operator: kitchenCapacity, pickupCapacity for future windows. |
-| `POST orders/:id/cancel` | Owning student; before preparation. |
-| `POST orders/:id/status` | Own operator: status preparing or ready. |
-| `POST orders/:id/collect` | Own operator: `{ code, paymentReceived: true }`. |
-| `POST incidents` | Own operator: itemIds (empty = all), reason, delayMinutes. |
-| `POST incidents/:id/resolve` | Own operator. |
-| `POST recovery/evaluate` | Own operator: orderId. |
-| `POST proposals` | Own operator: orderId, itemId, slotId, reason. |
-| `POST proposals/:id/approve` | Own operator: `{ approve }`. |
-| `POST proposals/:id/respond` | Owning student: `{ accept }`. |
+## Deferred integrations
 
-Complete menu fields: name, description, category, art, priceSen, stock, prepMinutes, prepUnits, enabled. Confirmed prices are snapshots, not references to future menu prices.
-
-## Errors
-
-- `{ error: { code, message } }` with appropriate HTTP status.
-- 401: sign in again; 403: ownership/role/CSRF/origin rejection.
-- 409: stale price, full slot, stock change, conflicting key, overlapping pickup or invalid state.
-- 429: rate limit, login or pickup lockout.
-- On an uncertain transport outcome, check/retry the original checkout key; never silently submit another basket.
+Legacy MCP tools are retained, but actual Gemini Enterprise connectivity is unverified. The v0.3 product requires local mode. Google migration must preserve atomic multi-kitchen writes, current permissions and the full acceptance suite.

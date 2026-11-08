@@ -1,3 +1,5 @@
+import { foodRevision } from './food.js';
+import { foodCheck, isClosed, emptyProfile } from '../shared/features.js';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Actor, BasketGroup, BasketQuote, CheckoutResult, PublicOrder } from '../shared/model.js';
 import { MealService, parsePlan, parseSelections } from './domain.js';
@@ -19,8 +21,8 @@ function canonical(value: unknown): string {
     return JSON.stringify(value) ?? 'null';
 }
 function visible(o: PublicOrder): PublicOrder {
-    const { collectionFailures: _failures, collectionLockedUntil: _lock, ...safe } = o as PublicOrder & { collectionFailures?: number; collectionLockedUntil?: unknown };
-    if (['collected', 'cancelled'].includes(safe.status)) delete safe.pickupCode;
+    const { qrToken: _qr, collectionFailures: _failures, collectionLockedUntil: _lock, ...safe } = o as PublicOrder & { qrToken?: string; collectionFailures?: number; collectionLockedUntil?: unknown };
+    if (isClosed(safe.status)) delete safe.pickupCode;
     return safe;
 }
 export class CheckoutService {
@@ -32,7 +34,10 @@ export class CheckoutService {
         const service = new MealService(new DraftStore(this.db.read().vendors), this.clock, 'pay_at_pickup');
         const quotes = await Promise.all(groups.map(g => service.quote(actor, { ...g, plan })));
         const totalSen = quotes.reduce((sum, q) => sum + q.totalSen, 0);
-        return { groups: quotes, totalSen, reasons: [...quotes.flatMap(q => q.reasons), ...(totalSen > plan.budgetSen ? ['The combined basket exceeds your budget.'] : [])] };
+        const data = this.db.read(); const preferences = data.profiles?.[actor.id]?.preferences ?? emptyProfile().preferences;
+        const dietaryReasons = groups.flatMap(g => g.items.flatMap(l => { const i = data.vendors[g.vendorId]!.items.find(i => i.id === l.itemId)!; return foodCheck(i.foodInfo, preferences, this.clock()).reasons.map(r => `${i.name}: ${r}`); }));
+        const menuVersions = Object.fromEntries(groups.flatMap(g => g.items.map(l => [`${g.vendorId}:${l.itemId}`, foodRevision(data.vendors[g.vendorId]!.items.find(i => i.id === l.itemId)!.foodInfo)])));
+        return { groups: quotes, menuVersions, totalSen, reasons: [...dietaryReasons, ...quotes.flatMap(q => q.reasons), ...(totalSen > plan.budgetSen ? ['The combined basket exceeds your budget.'] : [])] };
     }
     lookup(actor: Actor, key: string): CheckoutResult | null {
         requireThat(actor.role === 'student', 'FORBIDDEN', 'A student account is required.', 403);
@@ -51,7 +56,7 @@ export class CheckoutService {
         const b = object(input); const groups = groupsFor(b.groups, true); const rawPlan = object(b.plan);
         const transferMinutes = integer(b.transferMinutes ?? 2, 'Walk between counters', 0, 15);
         const expectedTotalSen = integer(b.expectedTotalSen, 'Reviewed total', 1, 50000);
-        const fingerprint = createHash('sha256').update(canonical({ groups, plan: rawPlan, transferMinutes, expectedTotalSen })).digest('hex');
+        const fingerprint = createHash('sha256').update(canonical({ groups, plan: rawPlan, transferMinutes, expectedTotalSen, menuVersions: b.menuVersions })).digest('hex');
         const requestKey = createHash('sha256').update(`${actor.id}:${key}`).digest('hex');
         return this.db.transaction(async draft => {
             const previous = draft.checkouts[requestKey];
@@ -63,6 +68,14 @@ export class CheckoutService {
                     return visible(o);
                 });
                 return { id: previous.id, orders, totalSen: orders.reduce((n, o) => n + o.totalSen, 0) };
+            }
+            const preferences = draft.profiles?.[actor.id]?.preferences ?? emptyProfile().preferences;
+            for (const g of groups) for (const l of g.items) {
+                const item = draft.vendors[g.vendorId]?.items.find(i => i.id === l.itemId);
+                requireThat(item, 'NOT_FOUND', 'Menu item not found.', 404);
+                const check = foodCheck(item.foodInfo, preferences, this.clock());
+                requireThat(check.suitable, 'DIETARY_CONFLICT', `${item.name}: ${check.reasons.join(' ')}`, 409);
+                if (item.foodInfo) requireThat(object(b.menuVersions ?? {})[`${g.vendorId}:${l.itemId}`] === foodRevision(item.foodInfo), 'MENU_CHANGED', 'Ingredient information changed. Review the latest basket before ordering.', 409);
             }
             const now = this.clock(); const plan = parsePlan(rawPlan, now);
             const service = new MealService(new DraftStore(draft.vendors), () => now, 'pay_at_pickup');
@@ -76,8 +89,9 @@ export class CheckoutService {
             const checkoutId = randomUUID(); const orders: PublicOrder[] = [];
             for (const group of groups) {
                 const order = await service.createOrder(actor, { ...group, plan }, `checkout-${checkoutId}`);
-                draft.vendors[group.vendorId]!.orders.find(o => o.id === order.id)!.checkoutId = checkoutId;
-                orders.push({ ...order, checkoutId });
+                const saved = draft.vendors[group.vendorId]!.orders.find(o => o.id === order.id)!;
+                saved.checkoutId = checkoutId; saved.dietary = structuredClone(preferences);
+                orders.push({ ...order, checkoutId, dietary: structuredClone(preferences) });
             }
             const totalSen = orders.reduce((n, o) => n + o.totalSen, 0);
             requireThat(totalSen <= plan.budgetSen, 'BUDGET_EXCEEDED', 'The combined basket exceeds your budget.', 409);

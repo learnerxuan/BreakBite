@@ -1,21 +1,12 @@
 # BreakBite
 ## Order ahead. Enjoy your break.
 
-- **Purpose:** Browse campus menus, pre-order before arriving, and collect at a convenient time.
 - **Track:** Smart Campus & Student Experience.
-- **Team:** ByteShift (working name).
-- **Current release:** v0.2 — working local-account website with persistent JSON storage.
-- **No Google or Gemini license is needed for this release.** Their actual integration is deferred, not claimed complete.
-
-## Problem and solution
-
-- Walk-up ordering means waiting to order and then waiting for food preparation.
-- Students should be able to order before class ends, while studying, or whenever convenient; they do not need a short break to benefit.
-- BreakBite checks stock, preparation lead time and kitchen/counter capacity before confirming.
-- **Mix kitchens:** buy a meal from one counter and a drink from another in the same basket.
-- **Choose pickup times:** each kitchen gets a separate order, status, amount due and pickup code.
-- **Fit my break is optional:** ordinary ordering does not ask for a class timetable.
-- This reduces avoidable waiting; it does not guarantee instant preparation or zero queues.
+- **Current version:** v0.3 — a working website with local accounts and persistent JSON storage.
+- **For APU students:** an independent student project, not an official campus service.
+- Browse before arriving, order from multiple kitchens, choose realistic pickup windows and collect separately.
+- Ordinary ordering works without a timetable. **Fit my break** is optional.
+- Google Cloud/Firebase migration and actual Gemini Enterprise integration remain deferred.
 
 ## Run
 
@@ -24,102 +15,99 @@ Requires **Node.js 22.16+**.
 ```bash
 npm install
 npm run check
+npm run operator
 npm start
 ```
 
-Open `http://127.0.0.1:8080`.
-
-- The first page shows the menu, not demo-account buttons.
-- Students register with a name, email and password (10–128 characters).
-- Browse without signing in; authentication is required to place orders.
-- Sign-in uses HttpOnly cookies. Accounts, sessions and orders survive restarts.
-- Copy `.env.example` to `.env` only when changing settings. Old installations must change `AUTH_MODE=demo` to `AUTH_MODE=local`.
-- A ready-to-run ZIP includes `dist/`; its first launch only needs `npm start`.
-
-### Create kitchen operators
-
-Stop the server, then run:
-
-```bash
-npm run operator
-```
-
-- Enter an operator email, name, a kitchen ID (`bowl-lab` or `noodle-co`) and your own password.
-- Repeat for the other kitchen, then restart `npm start`.
-- Operators sign in through the same website. Students cannot select or grant themselves a vendor role.
-- No default or shared operator password is published.
-- Administrative password reset: `npm run operator -- --reset --email=user@example.com` (server stopped; password prompted).
+- Open `http://127.0.0.1:8080`.
+- `npm run operator` creates a kitchen account. Choose `bowl-lab` or `noodle-co`; run it while the server is stopped.
+- Students register on the website. Kitchen roles cannot be self-selected.
+- Existing installations: keep `AUTH_MODE=local` and `STORE=file`; back up `.data/` before upgrading.
+- The ready-to-run archive includes `dist/`, so `npm start` and `npm run operator` work without installing build tools.
+- Never share runtime databases, passwords or pickup credentials in the repository.
 
 ## Working features
 
-| Student | Kitchen operator |
+| Area | Implemented behaviour |
 | --- | --- |
-| Guest browsing, search and category/kitchen filters | Authenticated kitchen-scoped workspace |
-| Multi-kitchen basket with per-kitchen pickup windows | Independent order queues and preparation states |
-| Optional break/budget planning | Menu creation and editing: name, description, price, stock, preparation |
-| One all-or-nothing checkout across kitchens | Availability controls and pause/reopen |
-| Separate child orders, codes and amounts | Rolling pickup windows and future capacity settings |
-| Order updates every five seconds | Delay reports and rule-checked recovery proposals |
-| Cancel an individual order before preparation | Approval before a student is offered a replacement |
-| Accept/decline a proposed alternative | Pickup-code verification and counter-payment recording |
-| Recover an uncertain checkout without duplicating orders | Editable kitchen profile and operation history |
+| Ordering | Guest browsing, multiple kitchens in one basket, independent pickup windows/codes, atomic all-or-nothing checkout, durable retry recovery. |
+| QR pickup | Private QR per kitchen order; merchant camera/USB scan or manual-code fallback; ready-state, kitchen, payment and one-use checks. |
+| Saved meals | Favourites, recently ordered meals, named usual baskets, rename/remove and repeat ordering with current prices, food information and fresh slots. |
+| Food information | Vendor-entered ingredients, spice, dietary declarations, contains/may-contain warnings and evidence references; saved student restrictions and explicit unknown states. |
+| Campus content | Editable kitchen campus/location/menu source, permission-confirmed local photograph uploads, responsive APU-focused interface. |
+| Availability | Current online kitchen/counter allocation and next available windows; no claim to measure the physical queue or predict demand. |
+| Collection policies | Configurable ordering/cancellation cutoffs, snapshotted order rules, server-generated ready/due/overdue reminders, merchant-confirmed uncollected closure and corrections. |
+| Timetable | Manual classes, optional weekly repetitions, bounded `.ics` preview/selection/import, delete controls and suggested timetable gaps. No APSpace credentials or live sync. |
+| Deadline help | Move a not-yet-preparing order into genuinely free earlier capacity, or request reviewed alternatives. Other students are never pushed back. |
+| Kitchen operations | Menu/stock editing, preparation queue, pause/reopen, capacity settings, delays, consent-based alternatives, collection and operation history. |
 
-## Multi-kitchen checkout rules
+## Important workflow rules
 
-- One checkout creates one child order per kitchen. This is not a single shared kitchen ticket.
-- Every kitchen's stock and capacity are validated in one JSON database transaction.
-- If any child order fails, none of the checkout is committed. No hidden partial success.
-- Requests have student-scoped idempotency keys, stored durably with their child-order references.
-- Each pickup window must allow one minute for handover plus the user's estimated walk between counters.
-- After confirmation, kitchens prepare independently. One delayed or cancelled child does not silently cancel the others.
-- Up to five kitchens per checkout and five portions per kitchen are currently supported. The starter catalogue has two kitchens.
-- **Pay at pickup:** pay each kitchen separately. An operator confirms receipt before completing collection. The app does not process online payments or refunds.
+- Each kitchen receives its own child order, amount due and collection credential.
+- One unavailable kitchen aborts the entire new checkout; no hidden partial order.
+- After confirmation, kitchens fulfil independently. Changes recheck active sibling pickup times.
+- **Pay at each counter:** staff confirm payment received before handover. The website does not process APCard, cards, refunds or settlement.
+- A repeat order rebuilds a basket for review; it never silently places an order or reuses an old slot.
+- Saved dietary restrictions are enforced at checkout and replacement acceptance. Unknown data cannot satisfy an active restriction.
+- Halal/gluten-free references are **vendor supplied**, with expiry/review dates; BreakBite does not independently certify them.
+- Ingredient changes invalidate stale checkout/replacement reviews. Confirmed orders retain their original ingredient snapshots.
+- Pickup grace begins after the **later of actual Ready or the booked window end**. Early preparation does not shorten it.
+- Overdue orders remain collectable until the merchant closes them. Prepared food and used kitchen capacity are not automatically restored.
+- Vendor-caused delay permits eligible cancellation without a no-show record. No automatic fines, strikes or bans are applied.
 
-## JSON storage and security boundaries
+## QR, notifications and calendar boundaries
 
-- `.data/database.json`: kitchens, menus, orders, users, sessions and checkout records.
-- `.data/database.previous.json`: previous saved snapshot; this is not a complete backup strategy.
-- Global serialisation + flushed temporary file + atomic rename prevent partial multi-kitchen writes in one process.
-- A process lock rejects a second server using the same directory. Do not run multiple replicas or use a shared/network filesystem.
-- Existing per-kitchen JSON files are imported only if the aggregate database does not yet exist; invalid data is not silently reset.
-- Passwords use salted scrypt; stored session tokens are hashed; mutations require CSRF tokens.
-- Role and ownership checks remain on the server. Prices and stock are never trusted from the browser.
-- Email verification, email password-reset delivery, distributed rate limiting and production security certification are **not** implemented.
+- QR camera scanning needs HTTPS (or computer localhost), permission and a browser with `BarcodeDetector` QR support. USB scanner text and the original manual pickup-code form remain available where camera decoding is unsupported.
+- QR generation is local. No credential is sent to an external QR image service; no camera image is uploaded.
+- Reminders are generated by the running server every 15 seconds and stored in a private account inbox. The open website can display device notifications after permission.
+- **Closed-browser push/email/SMS is not implemented.** Server-side reminder creation is not the same as guaranteed device delivery.
+- Calendar import expands up to 90 days and 1,000 occurrences. Supported recurrences: DAILY/WEEKLY, interval/count/until/weekdays, exclusions/additions and individual changes.
+- UTC, Malaysia and Singapore zones are supported. Unsupported/all-day/malformed series produce warnings instead of guessed dates.
+- Imported calendars are snapshots. Preview and confirm, re-import after changes, and delete at any time.
 
-## Mobile website
+## Real campus data
 
-- The same responsive site supports phone, tablet and desktop layouts; no APK is required.
-- The mobile basket button, touch-friendly forms and per-kitchen order cards are implemented.
-- See [local setup and phone testing](docs/LOCAL_MVP.md). Default localhost is not reachable from a separate phone.
-- A manifest is included. Offline ordering and push notifications are not claimed.
+- Starter kitchens, menus and illustrations are labelled sample content, not verified APU vendors.
+- Operators can replace menus, upload owned/licensed photographs, record the review source and confirm their kitchen data.
+- Do not remove sample labels merely to imply deployment. Obtain actual vendor confirmation first.
+- No fabricated nutrition, halal certification, allergy guarantees, time-saving percentage or university endorsement.
 
-## Code map
+## Storage and security
+
+- `.data/database.json`: accounts, sessions, kitchens, orders, checkout keys, saved meals, preferences, timetables and notices.
+- `.data/media/`: uploaded raster photographs; include this directory in private backups.
+- Single-process lock, serialized draft transaction, flushed temporary file and atomic rename protect multi-kitchen writes.
+- Previous JSON snapshot is retained; it is not a complete backup strategy. No multiple replicas/shared filesystem.
+- Salted scrypt passwords, hashed opaque sessions, HttpOnly cookies, CSRF protection, server-side role/ownership checks and rate limits.
+- The optional v0.3 fields migrate in place; existing accounts/orders remain. Legacy ready orders without a timestamp receive a fresh grace period when first observed.
+- Email verification/reset delivery, distributed abuse protection, independent security audit and campus-scale performance are not completed.
+
+## Development
 
 ```text
-src/server/accounts.ts           Local credentials, cookie sessions and reset
-src/server/local-database.ts     JSON persistence, locking and draft transactions
-src/server/checkout.ts           Atomic multi-kitchen checkout and retry lookup
-src/server/domain.ts             Stock, capacity, order lifecycle and recovery
-src/server/http.ts               HTTP endpoints and security checks
-src/web/main.ts                  Application controller and events
-src/web/views/student.ts         Student catalogue, basket, checkout and orders
-src/web/views/vendor.ts          Kitchen queue, menu, recovery and settings
-src/web/product.css              Responsive product layout
-src/shared/model.ts              Shared TypeScript contracts
+src/server/product.ts       Saved meals, QR, timetable, notifications and deadline helpers
+src/server/food.ts          Validated vendor food information and review fingerprints
+src/server/timetable.ts     Bounded iCalendar parsing and expansion
+src/server/policy.ts        Collection rules and online booking load
+src/server/checkout.ts      Atomic multi-kitchen ordering and retry lookup
+src/server/domain.ts        Authoritative stock, state transitions and recovery
+src/server/local-database.ts JSON transactions, locks and ownership boundaries
+src/shared/features.ts     Shared product contracts
+src/shared/qr.ts           Original QR encoder (version 5-L)
+src/web/views/             Student, kitchen and personal pages
+src/web/product-actions.ts  Camera, photo, saved meal and timetable interactions
 ```
 
-- TypeScript/native browser modules, CSS and Node.js; not React.
-- No runtime npm dependencies. Development uses pinned TypeScript and Node declarations.
-- Starter menus and illustrations are sample content, not verified APU stalls. Operators can replace/review them; sample labels are not removed merely to look deployed.
+TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm dependencies.
 
-## Tests and next steps
+## Verification and guides
 
-- `npm run check`: type checking, **67 automated tests**, then build.
-- New coverage includes multi-kitchen rollback, concurrent checkout, persistence, cookie/CSRF auth, payment confirmation and recovery.
-- UI journeys tested at desktop and 390/360/768px widths using a local renderer/API bridge. Normal browser navigation was blocked in the test environment; real-device/network testing remains necessary.
-- [Current test report](docs/TEST_REPORT.md)
-- [Local operation, operator setup, phone access and migration notes](docs/LOCAL_MVP.md)
-- [Current implementation](docs/IMPLEMENTATION.md)
-- [HTTP API](docs/API.md)
-
-**Deferred:** Google Cloud/Firebase deployment, a multi-kitchen cloud transaction adapter, actual Gemini Enterprise registration/calls, online payment processing, and a real campus pilot. Legacy cloud/MCP adapters remain in source, but the v0.2 product UI deliberately requires local mode until that migration is tested. This is a functional local MVP, not a claim that all hackathon requirements or production requirements are already satisfied.
+- `npm run check`: type checking, **107 automated tests**, production build.
+- Original and v0.3 browser journeys passed in an isolated renderer/local-API bridge at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
+- Actual phone camera, normal browser networking/TLS, real Google accounts and public deployment are not claimed tested.
+- [v0.3 features and review guide](docs/RELEASE_0_3.md)
+- [Test results and limitations](docs/TEST_REPORT.md)
+- [Local setup and phone access](docs/LOCAL_MVP.md)
+- [Implemented architecture](docs/IMPLEMENTATION.md)
+- [API](docs/API.md)
+- [Future Google/Gemini setup](docs/MANUAL_SETUP.md)

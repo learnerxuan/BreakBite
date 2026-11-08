@@ -21,4 +21,4 @@ export const art = (kind: MenuItem['art'], large = false) => `<div class="food-a
 export const localValue = (iso: string): string => new Date(Date.parse(iso) + 8 * 3600000).toISOString().slice(0, 16);
 export const fromLocal = (value: FormDataEntryValue | null): string => { const date = new Date(`${String(value)}+08:00`); if (!Number.isFinite(date.getTime())) throw new Error('Choose a valid date and time.'); return date.toISOString(); };
 export const short = (id: string): string => id.slice(0, 8).toUpperCase();
-export const statusLabel = (s: string): string => ({confirmed:'Confirmed',preparing:'Preparing',ready:'Ready to collect',collected:'Collected',cancelled:'Cancelled'}[s] ?? s.replaceAll('_',' '));
+export const statusLabel = (s: string): string => ({confirmed:'Confirmed',preparing:'Preparing',ready:'Ready to collect',collected:'Collected',cancelled:'Cancelled',uncollected:'Uncollected'}[s] ?? s.replaceAll('_',' '));

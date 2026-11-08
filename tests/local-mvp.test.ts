@@ -194,3 +194,27 @@ test('a replacement cannot silently conflict with another active kitchen pickup'
     const p=await f.service.createProposal(bowl,'bowl-lab',{orderId:o.id,itemId:option.itemId,slotId:option.slotId});await f.service.approveProposal(bowl,'bowl-lab',p.id,{approve:true});
     const before=f.db.read();await assert.rejects(f.service.respondProposal(alex,'bowl-lab',p.id,{accept:true}),isCode('PICKUP_OVERLAP'));assert.deepEqual(f.db.read(),before);
 });
+
+test('HTTP product profile, favourites and timetable require owned sessions and CSRF',async t=>{
+    const f=await httpFixture(t);
+    assert.equal((await f.request('/api/product/profile')).status,401);
+    await f.request('/api/auth/register','POST',{name:'Profile owner',email:'profile@example.test',password:'Profile-password-123'});
+    assert.equal((await f.request('/api/product/favourite','POST',{itemId:'chicken-rice',saved:true},{'X-CSRF-Token':'invalid'})).status,403);
+    assert.equal((await f.request('/api/product/favourite','POST',{itemId:'chicken-rice',saved:true})).status,200);
+    assert.deepEqual((await f.request('/api/product/profile')).data.profile.favourites,['chicken-rice']);
+    assert.equal((await f.request('/api/product/timetable/manual','POST',{title:'Future class',location:'Room',startAt:new Date(Date.now()+3600000).toISOString(),endAt:new Date(Date.now()+7200000).toISOString(),weeks:1})).status,200);
+    assert.equal((await f.request('/api/product/profile')).data.profile.classes.length,1);
+    await f.request('/api/auth/logout','POST',{});
+    await f.request('/api/auth/register','POST',{name:'Other profile',email:'otherprofile@example.test',password:'Profile-password-123'});
+    const other=await f.request('/api/product/profile');assert.equal(other.data.profile.favourites.length,0);assert.equal(other.data.profile.classes.length,0);
+});
+test('HTTP student QR stays private and camera policy permits same-origin access only',async t=>{
+    const f=await httpFixture(t);await f.request('/api/auth/register','POST',{name:'QR owner',email:'qr@example.test',password:'Profile-password-123'});
+    const created=await f.request('/api/checkouts','POST',f.payload,{'Idempotency-Key':'http-qr-checkout'});const o=created.data.orders[0];
+    const qr=await f.request('/api/product/pickup/qr','POST',{vendorId:o.vendorId,orderId:o.id});assert.equal(qr.status,200);assert.match(qr.data.payload,/^BB1:/);
+    assert.equal((await f.request('/api/product/pickup/resolve','POST',{payload:qr.data.payload})).status,403);
+    assert.match(qr.headers.get('permissions-policy')!,/camera=\(self\)/);
+    assert.ok(!JSON.stringify((await f.request('/api/state')).data).includes('qrToken'));
+    await f.request('/api/auth/logout','POST',{});await f.request('/api/auth/register','POST',{name:'QR stranger',email:'qrstranger@example.test',password:'Profile-password-123'});
+    assert.equal((await f.request('/api/product/pickup/qr','POST',{vendorId:o.vendorId,orderId:o.id})).status,404);
+});

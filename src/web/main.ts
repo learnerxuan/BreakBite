@@ -1,3 +1,6 @@
+import { foodCheck, emptyProfile, type StudentProfile, type Notice, type BookingLoad } from '../shared/features.js';
+import { productActions, stopCamera } from './product-actions.js';
+import { personalView, productDialogs } from './views/personal.js';
 import type { AppConfig, BasketGroup, BasketQuote, CheckoutResult, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
 import { api, ApiError, restore, signIn, signOut } from './client.js';
 import { initialState } from './state.js';
@@ -6,6 +9,8 @@ import { explore, orders, checkoutDialog } from './views/student.js';
 import { vendor, menuDialog } from './views/vendor.js';
 const root=document.querySelector<HTMLDivElement>('#app')!;
 const s=initialState();
+let noticeIds = new Set<string>();
+let noticesInitialised = false;
 let timer: ReturnType<typeof setTimeout>; let refreshing=false;
 let attempt: { key: string; serialized: string; actorId: string } | null=null;
 try { attempt=JSON.parse(sessionStorage.getItem('breakbite-checkout-v2')??'null'); } catch { /* New checkout. */ }
@@ -19,8 +24,16 @@ const plan=()=>s.fitBreak?s.plan:{mode:'pickup',budgetSen:50000};
 const vendorPath=(part: string,id=s.actor?.vendorId??'')=>`/api/vendors/${encodeURIComponent(id)}/${part}`;
 function invalidate(): void { s.quote=null;s.chosen={};s.checkoutError='';s.uncertain=false;attempt=null;sessionStorage.removeItem('breakbite-checkout-v2');sessionStorage.setItem('breakbite-cart-v2',JSON.stringify(s.cart)); }
 async function refresh(): Promise<void> {
-    if(s.actor){s.snapshot=await api<Snapshot>('/api/state');s.actor=s.snapshot.actor;s.vendors=s.snapshot.vendors;s.items=s.snapshot.items;}
-    else {const c=await api<{vendors:Vendor[];items:MenuItem[]}>('/api/catalog');s.vendors=c.vendors;s.items=c.items;s.snapshot=null;}
+    if(s.actor){s.snapshot=await api<Snapshot>('/api/state');s.actor=s.snapshot.actor;s.vendors=s.snapshot.vendors;s.items=s.snapshot.items;
+        s.loads=await api<BookingLoad[]>('/api/product/loads');
+        if(s.actor.role==='student') {
+            const p=await api<{profile:StudentProfile;notices:Notice[]}>('/api/product/profile');
+            const fresh=p.notices.filter(n=>!n.readAt&&!noticeIds.has(n.id));
+            if(noticesInitialised && fresh.length) { notify(fresh[0]!.message); if('Notification' in window && Notification.permission==='granted')try{new Notification('BreakBite pickup update',{body:fresh[0]!.message,tag:fresh[0]!.id});}catch{/* Inbox is the reliable fallback. */} }
+            noticesInitialised=true;noticeIds=new Set(p.notices.map(n=>n.id));s.profile=p.profile;s.notices=p.notices;
+        } else {s.profile=emptyProfile();s.notices=[];}
+    }
+    else {const c=await api<{vendors:Vendor[];items:MenuItem[];loads:BookingLoad[]}>('/api/catalog');s.vendors=c.vendors;s.items=c.items;s.loads=c.loads;s.snapshot=null;s.profile=emptyProfile();s.notices=[];noticeIds.clear();noticesInitialised=false;}
     s.offline=false;
 }
 function authDialog(): string {
@@ -32,20 +45,20 @@ function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
     const student=s.actor?.role!=='vendor';
-    root.innerHTML=`<header class="bb-header"><a href="/" class="bb-brand" aria-label="BreakBite home"><span>b</span>BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}">Explore</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}">My orders</button>`:''}`:'<span class="bb-kicker">KITCHEN WORKSPACE</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
+    root.innerHTML=`<header class="bb-header"><a href="/" class="bb-brand" aria-label="BreakBite home"><span>b</span>BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}">Explore</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}">My orders</button><button data-view="saved" class="${s.view==='saved'?'active':''}">Saved</button><button data-view="planner" class="${s.view==='planner'?'active':''}">My planner</button><button data-view="inbox" class="${s.view==='inbox'?'active':''}">Inbox${s.notices.filter(n=>!n.readAt).length?` (${s.notices.filter(n=>!n.readAt).length})`:''}</button>`:''}`:'<span class="bb-kicker">KITCHEN WORKSPACE</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
     ${s.offline?'<div class="bb-offline" role="status">Connection interrupted. Retrying… Your confirmed orders are saved. Do not submit a new checkout for an uncertain request.</div>':''}
     ${s.uncertain?'<div class="bb-pending" role="alert">Your last checkout needs confirmation. Keep the same request to avoid duplicate orders. <button class="bb-button secondary" data-action="retry-checkout">Check / retry original checkout</button></div>':''}
-    <main id="main" class="bb-main">${s.actor?.role==='vendor'?vendor(s):s.view==='orders'?orders(s):explore(s)}</main><footer class="bb-footer"><strong>BreakBite<span>Order ahead. Enjoy your break.</span></strong><span>Pay at the counter · Pickup times are estimates · MYT (UTC+8)</span></footer>${authDialog()}${checkoutDialog(s)}${menuDialog(s)}`;
+    <main id="main" class="bb-main">${s.actor?.role==='vendor'?vendor(s):s.view==='orders'?orders(s):['saved','planner','inbox'].includes(s.view)?personalView(s):explore(s)}</main><footer class="bb-footer"><strong>BreakBite<span>Order ahead. Enjoy your break.</span></strong><span>For APU students · Independent student project · Pay at counter · Pickup estimates · MYT (UTC+8)</span></footer>${authDialog()}${checkoutDialog(s)}${menuDialog(s)}${productDialogs(s)}`;
     for(const dialog of root.querySelectorAll<HTMLDialogElement>('dialog')) {
-        dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){s.auth=null;s.editing=null;s.quote=null;render();}});
+        dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
     }
-    root.querySelectorAll<HTMLButtonElement>('button').forEach(b=>{if(s.busy)b.disabled=true;});
+    root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>{if(s.busy)b.disabled=true;});
     if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
 }
 async function work(fn: ()=>Promise<void>): Promise<void> {
     if(s.busy)return;s.busy=true;
     // Avoid replacing an active form and losing typed credentials while a request is running.
-    root.querySelectorAll<HTMLButtonElement>('button').forEach(b=>b.disabled=true);
+    root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>b.disabled=true);
     try{await fn();}
     catch(e){
         const message=e instanceof Error?e.message:'Request failed. Please retry.';
@@ -84,8 +97,10 @@ async function review(): Promise<void> {
     let end=0;
     for(const g of q.groups){const window=g.slots.find(w=>Date.parse(w.startAt)>=(end?end+s.transferMinutes*60000:0));s.chosen[g.vendorId]=window?.id??'';if(window)end=Date.parse(window.startAt)+60000;}
 }
+const extra=productActions(s,{work,render,refresh,invalidate,notify});
 root.addEventListener('click',event=>{
     const target=(event.target as Element).closest<HTMLElement>('button');if(!target||s.busy)return;
+    if(extra.click(target))return;
     const action=target.dataset.action;const id=target.dataset.id??'';const vid=target.dataset.vendor??s.actor?.vendorId??'';
     if(target.dataset.view){s.view=target.dataset.view as typeof s.view;if(s.view==='orders'&&!s.actor)s.auth='login';render();return;}
     if(target.dataset.vendorTab){s.vendorTab=target.dataset.vendorTab as typeof s.vendorTab;render();return;}
@@ -101,6 +116,7 @@ root.addEventListener('click',event=>{
     if(action==='add'||action==='plus'||action==='minus'){
         if(s.uncertain){notify('Confirm the previous checkout before changing this basket.',true);return;}
         const item=s.items.find(i=>i.id===id&&i.vendorId===vid);const line=s.cart.find(c=>c.itemId===id&&c.vendorId===vid);
+        if(action!=='minus'&&item&&!foodCheck(item.foodInfo,s.profile.preferences).suitable){notify('This meal does not match your saved dietary restrictions. Review its ingredients or your preferences.',true);return;}
         if(action!=='minus'&&(!item||!item.enabled||!s.vendors.find(v=>v.id===vid)?.open)){notify('This item is not available.',true);return;}
         const count=s.cart.filter(c=>c.vendorId===vid).reduce((n,c)=>n+c.quantity,0);
         if(action!=='minus'&&(count>=5||item!.stock<=(line?.quantity??0))){notify('This kitchen allows up to five portions per order, within available stock.',true);return;}
@@ -136,7 +152,7 @@ root.addEventListener('change',event=>{
     else if(el.name==='transferMinutes')s.transferMinutes=Number(el.value);
 });
 root.addEventListener('submit',event=>{
-    event.preventDefault();const form=event.target as HTMLFormElement;const f=new FormData(form);
+    event.preventDefault();const form=event.target as HTMLFormElement;const f=new FormData(form);if(extra.submit(form))return;
     if(form.id==='search-form'){s.search=String(f.get('search')??'');render();return;}
     void work(async()=>{
         if(form.id==='auth-form'){
@@ -147,16 +163,16 @@ root.addEventListener('submit',event=>{
             s.plan={breakStartAt:fromLocal(f.get('breakStartAt')),nextClassAt:fromLocal(f.get('nextClassAt')),walkToMinutes:Number(f.get('walkToMinutes')),returnMinutes:Number(f.get('returnMinutes')),eatMinutes:Number(f.get('eatMinutes')),bufferMinutes:Number(f.get('bufferMinutes')),budgetSen:Math.round(Number(f.get('budget'))*100)};invalidate();notify('Time preferences applied.');
         }else if(form.id==='checkout-form'){
             if(!s.quote)throw new Error('Review your basket first.');
-            const payload={groups:groupCart().map(g=>({...g,slotId:String(f.get(`slot:${g.vendorId}`)??'')})),plan:plan(),transferMinutes:s.transferMinutes,expectedTotalSen:s.quote.totalSen};
+            const payload={groups:groupCart().map(g=>({...g,slotId:String(f.get(`slot:${g.vendorId}`)??'')})),plan:plan(),transferMinutes:s.transferMinutes,expectedTotalSen:s.quote.totalSen,menuVersions:s.quote.menuVersions};
             const serialized=JSON.stringify(payload);
             if(!attempt||attempt.serialized!==serialized){attempt={key:requestId(),serialized,actorId:s.actor!.id};sessionStorage.setItem('breakbite-checkout-v2',JSON.stringify(attempt));}
             await sendAttempt();
         }else if(form.dataset.collect){await api(vendorPath(`orders/${encodeURIComponent(form.dataset.collect)}/collect`),'POST',{code:f.get('code'),paymentReceived:f.get('paymentReceived')==='on'});await refresh();notify('Pickup completed and counter payment recorded.');}
         else if(form.id==='incident-form'){const itemId=String(f.get('itemId')??'');await api(vendorPath('incidents'),'POST',{itemIds:itemId?[itemId]:[],reason:f.get('reason'),delayMinutes:Number(f.get('delayMinutes'))});s.recovery={};await refresh();notify('Delay reported. Affected order estimates updated.');}
         else if(form.id==='capacity-form'){await api(vendorPath('slots'),'POST',{kitchenCapacity:Number(f.get('kitchenCapacity')),pickupCapacity:Number(f.get('pickupCapacity'))});await refresh();notify('Capacity saved for future pickup windows.');}
-        else if(form.id==='vendor-profile'){await api(vendorPath('profile'),'PATCH',{name:f.get('name'),location:f.get('location'),description:f.get('description'),confirmMenu:f.get('confirmMenu')==='on'});await refresh();notify('Kitchen profile saved.');}
+        else if(form.id==='vendor-profile'){await api(vendorPath('profile'),'PATCH',{name:f.get('name'),location:f.get('location'),description:f.get('description'),confirmMenu:f.get('confirmMenu')==='on',menuSource:f.get('menuSource'),campus:f.get('campus'),policies:{cutoffMinutes:Number(f.get('cutoffMinutes')),cancellationMinutes:Number(f.get('cancellationMinutes')),holdMinutes:Number(f.get('holdMinutes')),delayGraceMinutes:Number(f.get('delayGraceMinutes'))}});await refresh();notify('Kitchen profile saved.');}
         else if(form.id==='item-form'){
-            const editing=s.editing;const payload={name:f.get('name'),description:f.get('description'),category:f.get('category'),art:f.get('art'),priceSen:Math.round(Number(f.get('price'))*100),stock:Number(f.get('stock')),prepMinutes:Number(f.get('prepMinutes')),prepUnits:Number(f.get('prepUnits')),enabled:f.get('enabled')==='on'};
+            const editing=s.editing;const payload={name:f.get('name'),description:f.get('description'),category:f.get('category'),art:f.get('art'),priceSen:Math.round(Number(f.get('price'))*100),stock:Number(f.get('stock')),prepMinutes:Number(f.get('prepMinutes')),prepUnits:Number(f.get('prepUnits')),enabled:f.get('enabled')==='on',foodInfo:{ingredients:f.get('ingredients'),allergensKnown:f.get('allergensKnown')==='on',allergens:f.getAll('allergens'),mayContain:f.getAll('mayContain'),diets:f.getAll('diets'),spice:f.get('spice'),confirmed:f.get('foodConfirmed')==='on',...(String(f.get('halalReference')??'').trim()?{halalEvidence:{reference:f.get('halalReference'),expiresOn:f.get('halalExpiry')}}:{}),...(String(f.get('glutenReference')??'').trim()?{glutenFreeEvidence:{reference:f.get('glutenReference'),expiresOn:f.get('glutenExpiry')}}:{})}};
             await api(vendorPath(editing&&editing!=='new'?`items/${encodeURIComponent(editing.id)}`:'items'),editing&&editing!=='new'?'PATCH':'POST',payload);s.editing=null;await refresh();notify('Menu item saved.');
         }
     });
@@ -168,9 +184,9 @@ async function boot(): Promise<void> {
         s.actor=await restore();if(s.actor?.role==='vendor')s.view='vendor';await refresh();
         if(attempt&&attempt.actorId===s.actor?.id){const prior=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(attempt.key)}`);if(prior.checkout){confirmed(prior.checkout);await refresh();}else s.uncertain=true;}
         render();
-        setInterval(()=>{if(refreshing||s.busy||document.hidden)return;refreshing=true;
-            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline});
-            void refresh().then(()=>{const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline});const editing=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName??'');if(before!==after&&!editing&&!s.quote&&!s.auth&&!s.editing)render();}).catch(e=>{if(e instanceof ApiError&&e.status===401){s.actor=null;s.snapshot=null;s.auth='login';s.authError='Your session expired. Please sign in again.';render();}else{if(!s.offline){s.offline=true;if(!s.auth&&!s.quote&&!s.editing)render();}}}).finally(()=>refreshing=false);
+        setInterval(()=>{if(refreshing||s.busy||s.scanner)return;refreshing=true;
+            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads});
+            void refresh().then(()=>{const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads});const editing=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName??'');if(before!==after&&!editing&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}).catch(e=>{if(e instanceof ApiError&&e.status===401){s.actor=null;s.snapshot=null;s.auth='login';s.authError='Your session expired. Please sign in again.';render();}else{if(!s.offline){s.offline=true;if(!s.auth&&!s.quote&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}}}).finally(()=>refreshing=false);
         },5000);
     }catch(e){root.innerHTML=`<main class="bb-empty"><h1>Unable to open BreakBite</h1><p>${esc(e instanceof Error?e.message:'Please restart the application.')}</p><a href="/" class="bb-button primary">Try again</a></main>`;}
 }

@@ -1,3 +1,4 @@
+import { ProductService } from './product.js';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -15,13 +16,13 @@ function json(res: ServerResponse, status: number, value: unknown): void {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(value));
 }
-async function body(req: IncomingMessage): Promise<unknown> {
+async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
     requireThat(req.headers['content-type']?.split(';')[0] === 'application/json', 'CONTENT_TYPE', 'Use application/json.', 415);
     let size = 0;
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
         size += chunk.length;
-        requireThat(size <= 32768, 'BODY_TOO_LARGE', 'Request exceeds 32 KB.', 413);
+        requireThat(size <= limit, 'BODY_TOO_LARGE', 'Request exceeds the allowed size.', 413);
         chunks.push(Buffer.from(chunk));
     }
     try {
@@ -34,6 +35,7 @@ async function body(req: IncomingMessage): Promise<unknown> {
 export function createApp(config: Settings, service: MealService, db?: LocalDatabase) {
     const auth = new Auth(config);
     const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
+    const product = db ? new ProductService(db) : undefined;
     const checkout = db ? new CheckoutService(db) : undefined;
     const authLimits = new Map<string, { count: number; until: number }>();
     const limits = new Map<string, {
@@ -45,8 +47,8 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Referrer-Policy', 'same-origin');
         res.setHeader('X-Frame-Options', 'DENY');
-        res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-        res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+        res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+        res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
         try {
             const url = new URL(req.url ?? '/', 'http://localhost');
             const pathname = url.pathname;
@@ -69,8 +71,12 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 res.end();
                 return;
             }
+            if (db && /^\/media\/[a-f0-9]{64}\.(png|jpg|webp)$/.test(pathname) && req.method === 'GET') {
+                const bytes = await readFile(path.join(db.directory, 'media', path.basename(pathname))).catch(() => { throw new AppError(404, 'NOT_FOUND', 'Photo not found.'); });
+                res.writeHead(200, { 'Content-Type': pathname.endsWith('.png') ? 'image/png' : pathname.endsWith('.webp') ? 'image/webp' : 'image/jpeg', 'Cache-Control': 'public,max-age=86400' }); res.end(bytes); return;
+            }
             if (pathname === '/healthz') {
-                json(res, 200, { ok: true, version: '0.2.0', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
+                json(res, 200, { ok: true, version: '0.3.0', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
                 return;
             }
             const key = req.socket.remoteAddress ?? 'unknown';
@@ -106,7 +112,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
             }
             if (config.mode === 'local' && pathname === '/api/catalog' && req.method === 'GET') {
                 const states = await Promise.all((await service.store.ids()).map(id => service.store.read(id)));
-                json(res, 200, { vendors: states.map(s => s.vendor), items: states.flatMap(s => s.items), serverTime: new Date().toISOString() });
+                json(res, 200, { vendors: states.map(s => s.vendor), items: states.flatMap(s => s.items), loads: product?.loads() ?? [], serverTime: new Date().toISOString() });
                 return;
             }
             if (accounts && ['/api/auth/login', '/api/auth/register'].includes(pathname) && req.method === 'POST') {
@@ -126,6 +132,34 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
             if (pathname.startsWith('/api/')) {
                 const actor = accounts ? accounts.authorize(req) : await auth.user(req);
                 const method = req.method;
+                if (product && pathname.startsWith('/api/product/')) {
+                    const route = pathname.slice('/api/product/'.length);
+                    if (route === 'profile' && method === 'GET') { await product.tick(); json(res, 200, product.profile(actor)); return; }
+                    if (route === 'loads' && method === 'GET') { json(res, 200, product.loads()); return; }
+                    requireThat(method === 'POST', 'METHOD_NOT_ALLOWED', 'Use POST for this action.', 405);
+                    const input = object(await body(req, route === 'photo' ? 2900000 : route === 'timetable/preview' ? 300000 : route === 'timetable/confirm' ? 65536 : 32768));
+                    let result: unknown = { ok: true };
+                    if (route === 'preferences') await product.preferences(actor, input);
+                    else if (route === 'favourite') await product.favourite(actor, input);
+                    else if (route === 'usual') await product.usual(actor, input);
+                    else if (route === 'reorder') result = product.reorder(actor, input);
+                    else if (route === 'notices/read') await product.markRead(actor);
+                    else if (route === 'timetable/preview') result = await product.previewTimetable(actor, input);
+                    else if (route === 'timetable/confirm') await product.confirmTimetable(actor, input);
+                    else if (route === 'timetable/manual') await product.manualClass(actor, input);
+                    else if (route === 'timetable/delete') await product.deleteClass(actor, input);
+                    else if (route === 'pickup/qr') result = await product.pickupQr(actor, String(input.vendorId ?? ''), String(input.orderId ?? ''));
+                    else if (route === 'pickup/resolve') result = product.resolveQr(actor, input);
+                    else if (route === 'pickup/collect') await product.collectQr(actor, input);
+                    else if (route === 'uncollected') await product.closeUncollected(actor, input);
+                    else if (route === 'no-show/correct') await product.correctNoShow(actor, input);
+                    else if (route === 'earlier/options') result = await product.earlierOptions(actor, String(input.vendorId ?? ''), String(input.orderId ?? ''));
+                    else if (route === 'earlier/confirm') await product.moveEarlier(actor, input);
+                    else if (route === 'assistance') result = await service.requestAssistance(actor, String(input.vendorId ?? ''), String(input.orderId ?? ''));
+                    else if (route === 'photo') await product.photo(actor, String(input.itemId ?? ''), input);
+                    else throw new AppError(404, 'NOT_FOUND', 'Product action not found.');
+                    await product.tick(); json(res, 200, result); return;
+                }
                 if (pathname === '/api/session' && method === 'GET') {
                     json(res, 200, { actor, ...(accounts ? { csrfToken: accounts.session(req).session.csrfToken } : {}) });
                     return;
@@ -143,7 +177,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                     json(res, 201, await checkout.submit(actor, await body(req), String(req.headers['idempotency-key'] ?? ''))); return;
                 }
                 if (pathname === '/api/state' && method === 'GET') {
-                    json(res, 200, await service.snapshot(actor, config.mode));
+                    await product?.tick(); json(res, 200, await service.snapshot(actor, config.mode));
                     return;
                 }
                 if (pathname === '/api/quote' && method === 'POST') {
@@ -206,7 +240,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 }
                 else
                     throw new AppError(404, 'NOT_FOUND', 'API route not found.');
-                json(res, 200, { ok: true });
+                await product?.tick(); json(res, 200, { ok: true });
                 return;
             }
             requireThat(req.method === 'GET' || req.method === 'HEAD', 'METHOD_NOT_ALLOWED', 'Use GET.', 405);

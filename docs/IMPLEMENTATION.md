@@ -1,78 +1,79 @@
-# Implemented architecture — v0.2
+# Implemented architecture — v0.3
 
-## Current runtime
+## Runtime
 
-- Native TypeScript browser modules + CSS; Node HTTP server.
-- Default: `AUTH_MODE=local`, `STORE=file`.
-- Cookie-authenticated students/operators with persistent accounts, sessions and orders.
-- JSON is the authoritative database, not a frontend mock. No Google/Gemini license required.
-- Cloud/MCP adapters remain as legacy migration code; the current UI deliberately requires local mode.
+- Native TypeScript/CSS browser modules and Node HTTP backend.
+- `AUTH_MODE=local`, `STORE=file`; cookie-authenticated accounts and persistent JSON.
+- A single locked database stores all kitchens. A checkout validates all children and writes one atomic file replacement, or commits nothing.
+- Legacy cloud/MCP adapters remain migration code. The product UI deliberately requires local mode until cloud multi-kitchen transactions are implemented and tested.
 
-## Ordering
+## Transaction and identity boundaries
 
-```text
-Student catalogue -> multi-kitchen basket -> per-kitchen pickup selection
- -> authenticated POST /api/checkouts
- -> one serialized database transaction
- -> validate every kitchen and the combined budget/itinerary
- -> reserve stock + kitchen workload + counter capacity
- -> flush temporary JSON and rename once
- -> return one checkout containing independent kitchen orders
-```
+- The server owns price, stock, role, identity, capacity and order status.
+- Student-scoped idempotency survives restarts and response loss.
+- Multi-kitchen child orders fulfil independently. Rescheduling/recovery revalidates the active sibling itinerary.
+- Cookie sessions are HttpOnly/SameSite=Strict; secure cookies require HTTPS. Authenticated writes require CSRF tokens.
+- Operators are provisioned by a stopped-server CLI, never public role selection.
+- JSON uses global serialization, draft rollback, checked schema, flushed temporary file, atomic rename and a process lock. No shared filesystem or multiple writers.
+- Database cap is 20 MB. The previous snapshot is only one recovery copy. Back up JSON and media privately.
 
-- A normal pickup plan is `{ mode: 'pickup', budgetSen }`; no fake class time is created.
-- Fit my break optionally supplies the earlier BreakPlan contract.
-- All kitchen writes share one draft. A rejected child discards the whole draft.
-- Student-scoped idempotency records survive restarts and map to the original child orders.
-- The lookup endpoint recovers a committed checkout after a response is lost.
-- Counter handovers are one minute each, plus user-supplied inter-counter walking time. This is a conservative constraint, not route mapping.
-- Inventory, price, timing, role and ownership are always revalidated on the server.
-- Current limits: five kitchens/checkout, five portions/kitchen, RM500 combined maximum.
+## Product service
 
-## Independent fulfilment
+- `product.ts`: favourites, usual baskets, reorder review, private preferences/calendar, QR handover, notices, uncollected handling, earlier capacity and media uploads.
+- `features.ts`: shared dietary, timetable, notice and policy contracts.
+- v0.3 profiles/notices/order fields are optional additions to schema 2. Existing v0.2 accounts and orders are preserved.
+- A repeat order is a current-data basket proposal, not a purchase. Price/ingredient changes and unavailable items produce warnings.
+- Student profiles and calendar previews are never included in the public catalogue or another student's view.
 
-- Each child: confirmed -> preparing -> ready -> collected; cancellation only before preparing.
-- Each child has its own pickup code, kitchen queue, amount and payment status.
-- Cancel/complete/delay one child without silently mutating siblings.
-- Payment is due at its counter. Collection requires the pickup code and explicit operator confirmation of payment received.
-- No card processing, settlement, online charge or online refund is implemented.
+## QR handover
 
-## Identity and storage
+- Original local version 5-L QR encoder, byte mode and mask 0, independently compared/decoded in testing.
+- Credential: `BB1:<order UUID>:<128-bit random token>`. It contains no student name, email or payment data.
+- Only the owner can request a QR. Operators resolve it only within their own kitchen, after Ready.
+- The merchant explicitly confirms counter payment and physical handover. Atomic collection consumes both QR and manual code.
+- A retry/duplicate/changed credential cannot collect twice. Replacement, rescheduling, cancellation and uncollected closure invalidate old credentials.
+- Camera images stay on the device. Native BarcodeDetector needs browser support and HTTPS/permission; manual and USB input remain fallback paths.
 
-- Salted scrypt (`N=32768, r=8, p=1`, 64-byte key); no plaintext passwords stored.
-- Opaque random session cookies, HttpOnly/SameSite=Strict, 12-hour expiry. Secure flag is configurable for HTTPS.
-- Only session-token hashes are persisted. CSRF tokens are required on authenticated mutations.
-- Roles cannot be selected in registration. Operator provisioning/reset requires server-side CLI access.
-- Sign-in request limits and account lockout are included; these are not distributed abuse protection.
-- Single-process JSON lock, global serialization, checked schema, a flushed temp file and rename.
-- Previous snapshot backup; 20 MB aggregate cap. No multi-replica/shared-filesystem support.
-- Invalid database data fails startup. Legacy kitchen files import only if no new database exists.
-- Browser/API data omit account password records; operator/MCP responses omit student pickup codes.
+## Food metadata and repeat safety
 
-## Frontend modules
+- Vendor-entered ingredients, known/unknown allergen status, contains/may-contain lists, spice and dietary declarations.
+- Source/expiry fields are mandatory for halal/gluten-free declarations. No independent certification or AI nutrition inference.
+- Saved restrictions fail closed on unknown or conflicting data.
+- A content hash, not only a timestamp, identifies reviewed food information.
+- Checkout and replacement acceptance reject changed food reviews. Confirmed order lines retain food snapshots; recovery evaluates current saved restrictions.
+- Photos are bounded raster uploads with ownership/permission acknowledgement, local hashed filenames and nosniff responses. SVG/HTML and external hotlinked images are not accepted.
 
-- `main.ts`: routing, state updates, handlers, checkout retry lifecycle.
-- `state.ts`: typed view state and non-sensitive basket cache.
-- `client.ts`: same-origin HTTP client and in-memory CSRF token (session cookie is HttpOnly).
-- `views/student.ts`: catalogue, optional planner, basket, grouped orders and checkout.
-- `views/vendor.ts`: order queue, menu editing, delays, approvals and settings.
-- `ui.ts`: escaped output helpers and original CSS illustrations.
-- `product.css`: responsive layout. Same site for desktop, tablet and mobile.
-- Poll every five seconds while visible; avoid replacing an actively edited form.
+## Time, policy and notices
 
-## Menu and scheduling
+- Normal ordering has no class requirement. Fit my break adds optional walking/eating/return/buffer constraints.
+- Kitchen workload and counter handover capacity are separate online allocations. Walk-in demand must be reserved by merchants.
+- New-order cutoff uses pickup start; normal cancellation requires both not preparing and before the snapshotted cancellation cutoff.
+- Vendor lateness beyond the agreed allowance enables no-strike cancellation; prepared ingredients are not returned to stock.
+- Ready captures actual time. Grace ends at max(actual Ready, booked window end) + agreed hold duration.
+- A server timer runs every 15 seconds and creates deduplicated private inbox notices. Late/overdue state does not depend on a student leaving the website open.
+- Overdue orders remain collectable until a merchant closes them with a reason. No automatic bans/fees, inventory restoration or retroactive capacity release.
+- Browser notifications work only with an open site and permission. Background push/email/SMS is not implemented.
 
-- Operators create/edit items, prices, stock, lead time, workload, category and illustration.
-- Confirmed line prices remain snapshots; changed checkout prices require review.
-- A running server refreshes a rolling three-hour schedule using operator-configured online capacity.
-- Walk-in demand must be reserved outside the online allocation. Existing reservations are not overwritten.
-- Starter menus are explicitly sample data until reviewed/replaced by an operator.
+## Availability and earlier assistance
 
-## Recovery
+- Booking indicators use the larger of kitchen and counter allocation usage. Labels show Available/Filling/Full/Closed and update time.
+- They do not measure physical lines or predict historical peaks.
+- Earlier-slot selection rechecks free capacity, current price/workload/food review and sibling timings atomically.
+- No other customer's reservation is displaced. If no suitable slot exists, preserve the original order.
+- Student-requested faster replacements still require merchant approval and final student consent.
 
-- Rule-based alternatives are same kitchen, no more expensive, and require approval plus consent.
-- Ordinary pickup can accept a later slot; break plans retain their deadline.
-- Single-item meal orders get meal alternatives; drink orders get drink alternatives.
-- Mixed-item child orders require manual handling rather than unsafe wholesale substitutions.
-- Recheck stock/price/version/expiry/capacity on student acceptance, then rotate the code.
-- Gemini execution, actual Google deployment, online payments and production certification are not claimed.
+## Timetable
+
+- Manual one-off/weekly classes and `.ics` preview/confirm with merge-or-replace imported entries.
+- 256 KB input, 1,000 source/expanded events, 90-day horizon, 15-minute private previews.
+- UTC/Malaysia/Singapore times; DAILY/WEEKLY recurrence, interval/count/until/weekdays, EXDATE/RDATE and individual changed/cancelled instances.
+- Unsupported/all-day/invalid series are warned and skipped as a unit, never guessed.
+- No remote calendar fetch, APSpace password, automatic account linkage or live sync.
+- Timetable gaps populate an optional break plan, not a capacity guarantee.
+
+## Browser and operational limits
+
+- Five-second polling; active editing and open scanner dialogs are not replaced by polling.
+- Structured static modules: student, vendor, personal views, product actions, shared state/controller.
+- Ordinary ordering continues without AI, camera or notification permissions.
+- Actual Google deployment, Gemini execution, online payments, email verification/reset, real-device camera/TLS and campus-scale security/load tests remain unverified or deferred.

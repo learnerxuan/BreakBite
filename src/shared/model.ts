@@ -1,3 +1,4 @@
+import type { FoodInfo, FoodPreferences, PickupPolicy } from './features.js';
 export type Role = 'student' | 'vendor' | 'agent';
 export interface Actor {
     id: string;
@@ -12,6 +13,8 @@ export interface Vendor {
     location: string;
     open: boolean;
     synthetic: boolean;
+    campus?: string; menuReviewedAt?: string; menuSource?: string;
+    policies?: PickupPolicy;
     onlineKitchenCapacity?: number;
     onlinePickupCapacity?: number;
 }
@@ -27,6 +30,7 @@ export interface MenuItem {
     prepUnits: number;
     enabled: boolean;
     art: 'rice' | 'noodles' | 'toast' | 'salad' | 'drink';
+    foodInfo?: FoodInfo; photoPath?: string; photoCredit?: string;
     tags: string[];
     allergens: string[] | null;
 }
@@ -58,8 +62,9 @@ export interface OrderLine extends Selection {
     name: string;
     unitPriceSen: number;
     prepUnits: number;
+    foodInfo?: FoodInfo;
 }
-export type OrderStatus = 'confirmed' | 'preparing' | 'ready' | 'collected' | 'cancelled';
+export type OrderStatus = 'confirmed' | 'preparing' | 'ready' | 'collected' | 'cancelled' | 'uncollected';
 export interface Order {
     id: string;
     studentId: string;
@@ -75,6 +80,11 @@ export interface Order {
     status: OrderStatus;
     version: number;
     pickupCode: string;
+    qrToken?: string;
+    readyAt?: string; collectionDueAt?: string; overdueAt?: string;
+    promisedPickupEndAt?: string; cancelBeforeAt?: string; policy?: PickupPolicy;
+    assistanceRequested?: boolean; dietary?: FoodPreferences; vendorDelayed?: boolean; closedReason?: string;
+    noShowRecorded?: boolean;
     createdAt: string;
     updatedAt: string;
     collectionFailures: number;
@@ -92,6 +102,8 @@ export interface Incident {
     createdAt: string;
 }
 export interface RecoveryOption {
+    foodInfo?: FoodInfo;
+    foodRevision?: string;
     itemId: string;
     itemName: string;
     quantity: number;
@@ -112,7 +124,7 @@ export interface Proposal {
     status: ProposalStatus;
     createdAt: string;
     expiresAt: string;
-    source: 'manual' | 'mcp';
+    source: 'manual' | 'mcp' | 'student';
 }
 export interface AuditEvent {
     id: string;
@@ -146,7 +158,7 @@ export interface Quote {
     slots: Slot[];
     reasons: string[];
 }
-export type PublicOrder = Omit<Order, 'pickupCode' | 'collectionFailures' | 'collectionLockedUntil'> & {
+export type PublicOrder = Omit<Order, 'pickupCode' | 'qrToken' | 'collectionFailures' | 'collectionLockedUntil'> & {
     pickupCode?: string;
 };
 export interface Snapshot {
@@ -174,5 +186,5 @@ export const time = (iso: string): string => new Intl.DateTimeFormat('en-MY', { 
 export const atRisk = (o: Pick<Order, 'estimatedReadyAt' | 'latestPickupAt' | 'status'>): boolean => ['confirmed', 'preparing'].includes(o.status) && o.estimatedReadyAt > o.latestPickupAt;
 
 export interface BasketGroup { vendorId: string; items: Selection[]; slotId?: string; }
-export interface BasketQuote { groups: Quote[]; totalSen: number; reasons: string[]; }
+export interface BasketQuote { menuVersions?: Record<string, string>; groups: Quote[]; totalSen: number; reasons: string[]; }
 export interface CheckoutResult { id: string; orders: PublicOrder[]; totalSen: number; }
