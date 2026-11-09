@@ -179,7 +179,23 @@ export interface AppConfig {
     mode: 'demo' | 'firebase' | 'local';
     firebaseApiKey: string;
     enterpriseConfigured: boolean;
+    apspaceConfigured?: boolean;
     demoIdentities: Actor[];
+}
+
+export interface ApspaceSelection { intake: string; group: string; }
+export interface ApspaceSource extends ApspaceSelection {
+    sourceRevision: string;
+    firstDate: string;
+    lastDate: string;
+    coveredDates: string[];
+    publishedAt?: string;
+}
+export interface ApspaceConnection extends ApspaceSource {
+    revision: string;
+    lastCheckedAt: string;
+    lastSuccessfulAt: string;
+    status: 'current' | 'review' | 'unavailable';
 }
 export const money = (sen: number): string => `RM ${(sen / 100).toFixed(2)}`;
 export const time = (iso: string): string => new Intl.DateTimeFormat('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' }).format(new Date(iso));

@@ -13,6 +13,7 @@ export interface TimetableState {
     preview: (AcceptedTimetable & TimetableImport & { selected: Set<string>; consent: boolean }) | null;
     date: string;
     applied: TimetableBreak | null;
+    appliedSaved?: boolean;
     loading: boolean;
     error: string;
     status: string;
@@ -28,6 +29,9 @@ export function defaultBreakPlan(now = Date.now()): BreakPlan {
 
 export interface ViewState {
     profile: StudentProfile; notices: Notice[]; loads: BookingLoad[];
+    apspaceSetup?: { options: { intake: string; groups: string[] }[]; intake: string; group: string; invalid?: boolean };
+    apspaceFeedback?: { text: string; error?: boolean };
+    apspaceReview?: { id: string; selectedIds: string[]; consent: boolean };
     detailItem: MenuItem | null; qr: { payload: string; code: string; kitchen: string } | null;
     scanner: boolean; scanResult: import('../shared/model.js').PublicOrder | null; scanPayload: string;
     basketMessages: string[]; earlier: Record<string, { slots: import('../shared/model.js').Slot[]; message: string }>;

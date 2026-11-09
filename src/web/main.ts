@@ -58,6 +58,9 @@ function setActor(actor: Actor | null): void {
         attempt = restoreAttempt(actor);
         s.uncertain = Boolean(attempt);
         timetable.reset();
+        delete s.apspaceSetup;
+        delete s.apspaceFeedback;
+        delete s.apspaceReview;
         s.fitBreak = false; s.plan = defaultBreakPlan(); s.planDraft = {}; s.manualPlan = false;
         s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
         s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
@@ -83,6 +86,7 @@ async function refresh(): Promise<void> {
                 if (noticesInitialised && fresh.length) notify(fresh[0]!.message);
                 noticesInitialised = true;
                 noticeIds = new Set(p.notices.map(n => n.id)); s.profile = p.profile; s.notices = p.notices;
+                timetable.clearStaleSavedBreak();
             }
             s.snapshot = snapshot; s.vendors = snapshot.vendors; s.items = snapshot.items; s.loads = loads;
         } catch (error) {
@@ -160,6 +164,16 @@ async function sendAttempt(): Promise<void> {
         throw e;
     }
 }
+async function checkSavedBreak(generation: number): Promise<boolean> {
+    if (s.fitBreak && s.timetable.appliedSaved) {
+        const { profile } = await api<{ profile: StudentProfile }>('/api/product/profile');
+        if (generation !== actorGeneration) return false;
+        s.profile = profile;
+        if (timetable.clearStaleSavedBreak()) throw new Error(s.checkoutError);
+    }
+    timetable.validateBreak();
+    return true;
+}
 async function review(): Promise<void> {
     if(s.uncertain){await sendAttempt();return;}
 
@@ -169,8 +183,13 @@ async function review(): Promise<void> {
     const generation = actorGeneration;
     let q: BasketQuote;
     try {
-        timetable.validateBreak();
-        q = await api<BasketQuote>('/api/checkout/quote','POST',{groups:groupCart(),plan:plan()});
+        if (!await checkSavedBreak(generation)) return;
+        const requestedPlan = plan();
+        q = await api<BasketQuote>('/api/checkout/quote','POST',{groups:groupCart(),plan:requestedPlan});
+        if (generation === actorGeneration) {
+            if (s.fitBreak && requestedPlan !== s.plan) throw new Error(s.checkoutError || 'Your break changed. Check pickup times again.');
+            timetable.validateBreak();
+        }
     } catch (error) {
         if (generation === actorGeneration && error instanceof Error) s.checkoutError = error.message;
         throw error;
@@ -181,14 +200,31 @@ async function review(): Promise<void> {
     let end=0;
     for(const g of q.groups){const window=g.slots.find(w=>Date.parse(w.startAt)>=(end?end+s.transferMinutes*60000:0));s.chosen[g.vendorId]=window?.id??'';if(window)end=Date.parse(window.startAt)+60000;}
 }
-const extra=productActions(s,{work,render,refresh,invalidate,notify,detachTimetable: timetable.detach});
+const extra=productActions(s,{work,render,refresh,invalidate,notify});
 root.addEventListener('click',event=>{
     const target=(event.target as Element).closest<HTMLElement>('button');if(!target||s.busy)return;
-    if(timetable.click(target))return;
-    if(extra.click(target))return;
     const action=target.dataset.action;
+    if(action==='saved-break'){
+        if (s.uncertain) return;
+        const quoteBasket = Boolean(target.closest('#basket') && s.cart.length);
+        try {
+            timetable.useSavedBreak(target.dataset.end);
+            if (quoteBasket) void work(review);
+        }
+        catch (error) { notify((error as Error).message,true); }
+        return;
+    }
+    if(extra.click(target))return;
+    if(timetable.click(target))return;
     if(action?.startsWith('push-')){void work(async()=>{notify(await pushAction(action,target.dataset.id,s.actor));});return;}const id=target.dataset.id??'';const vid=target.dataset.vendor??s.actor?.vendorId??'';
-    if(target.dataset.view){navigate(target.dataset.view as typeof s.view);if(['orders','saved','planner','inbox'].includes(s.view)&&!s.actor)s.auth='login';render();if(s.view==='inbox')void refreshPush(s.actor).then(()=>render());return;}
+    if(target.dataset.view){
+        navigate(target.dataset.view as typeof s.view);
+        if(['orders','saved','planner','inbox'].includes(s.view)&&!s.actor)s.auth='login';
+        render();
+        if(target.id==='apspace-open-planner')document.getElementById('apspace-connect-heading')?.focus();
+        if(s.view==='inbox')void refreshPush(s.actor).then(()=>render());
+        return;
+    }
     if(target.dataset.vendorTab){s.vendorTab=target.dataset.vendorTab as typeof s.vendorTab;render();return;}
     if(target.dataset.category){s.category=target.dataset.category;render();return;}
     if(action==='login'){s.auth='login';s.authError='';render();return;}
@@ -211,6 +247,11 @@ root.addEventListener('click',event=>{
         invalidate();render();if(action==='add')notify('Added to your basket. You can add items from other kitchens too.');return;
     }
     if(!action)return;
+    if(action==='review' && s.actor?.role==='student' && s.fitBreak && !s.uncertain && Object.keys(s.planDraft).length){
+        const form = document.querySelector<HTMLFormElement>('#plan-form')!;
+        try { timetable.applyForm(form); }
+        catch (error) { notify((error as Error).message, true); return; }
+    }
     void work(async()=>{
         if(action==='logout'){
             await signOut();setActor(null);s.view='explore';s.cart=[];s.recovery={};s.success='';
@@ -246,6 +287,7 @@ root.addEventListener('change',event=>{
 });
 root.addEventListener('input', event => {
     const input = event.target as HTMLInputElement;
+    if(extra.input(input))return;
     if (!s.busy && !s.uncertain && input.form?.id === 'plan-form') s.planDraft[input.name] = input.value;
 });
 root.addEventListener('submit',event=>{
@@ -263,8 +305,8 @@ root.addEventListener('submit',event=>{
             notify('Signed in.');
         }else if(form.id==='checkout-form'){
             if(s.uncertain){await sendAttempt();return;}
+            if (!await checkSavedBreak(actorGeneration)) return;
             if(!s.quote)throw new Error('Review your basket first.');
-            timetable.validateBreak();
             const payload={groups:groupCart().map(g=>({...g,slotId:String(f.get(`slot:${g.vendorId}`)??'')})),plan:plan(),transferMinutes:s.transferMinutes,expectedTotalSen:s.quote.totalSen,menuVersions:s.quote.menuVersions};
             const serialized=JSON.stringify(payload);
             if(!attempt||attempt.serialized!==serialized){
@@ -294,10 +336,10 @@ async function boot(): Promise<void> {
         render();
         setInterval(()=>{if(refreshing||s.busy||s.scanner)return;refreshing=true;
             const generation=actorGeneration;
-            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint()});
+            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
             void refresh().then(()=>{
                 if(generation!==actorGeneration){if(!s.busy)render();return;}
-                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint()});
+                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
                 const active=document.activeElement;
                 const editing=['INPUT','TEXTAREA','SELECT'].includes(active?.tagName??'')||Boolean(active?.closest('.bb-timetable, #plan-form'));
                 if(before!==after&&!editing&&!s.busy&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();

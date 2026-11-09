@@ -3,6 +3,7 @@ import { APSPACE_MAX_BYTES, findTimetableBreaks, malaysiaDate, parseApspaceCalen
 import { defaultBreakPlan, emptyTimetable, planningNow, type ViewState } from './state.js';
 import { fromLocal } from './ui.js';
 import { timetableDates } from './views/timetable.js';
+import { savedTimetableBreaks } from './views/apspace.js';
 
 const durationFields = ['walkToMinutes', 'returnMinutes', 'eatMinutes', 'bufferMinutes'] as const;
 const preferenceFields = ['budget', ...durationFields] as const;
@@ -47,6 +48,7 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
         delete s.planDraft.breakStartAt;
         delete s.planDraft.nextClassAt;
         s.timetable.applied = null;
+        s.timetable.appliedSaved = false;
         s.fitBreak = false;
     }
 
@@ -101,6 +103,7 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
         s.planDraft = {};
         s.manualPlan = false;
         s.timetable.applied = gap;
+        s.timetable.appliedSaved = false;
         s.timetable.error = '';
         s.timetable.status = 'Break applied. Review your time preferences and choose pickup times.';
         invalidate();
@@ -108,7 +111,45 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
         focus('plan-start');
     }
 
+    function savedBreakValid(): boolean {
+        const { applied, appliedSaved } = s.timetable;
+        if (!s.fitBreak || !applied || !appliedSaved) return true;
+        const now = planningNow(s);
+        return savedTimetableBreaks(s, now).some(gap => gap.endAt === applied.endAt &&
+            Date.parse(gap.startAt) <= Math.max(Date.parse(applied.startAt), now));
+    }
+
     return {
+        useSavedBreak(endAt: string | undefined): void {
+            if (s.busy || s.uncertain || s.actor?.role !== 'student') return;
+            const gap = savedTimetableBreaks(s).find(candidate => candidate.endAt === endAt);
+            if (!gap) throw new Error('That break has changed. Choose an upcoming break again.');
+            const form = document.querySelector<HTMLFormElement>('#plan-form');
+            const prefs = form ? preferences(form) : s.plan;
+            s.plan = { ...prefs, breakStartAt: gap.startAt, nextClassAt: gap.endAt };
+            s.planDraft = {};
+            s.manualPlan = false;
+            s.fitBreak = true;
+            s.view = 'explore';
+            s.timetable.applied = gap;
+            s.timetable.appliedSaved = true;
+            invalidate();
+            render();
+            focus('plan-start');
+        },
+        clearStaleSavedBreak(): boolean {
+            if (s.uncertain || savedBreakValid()) return false;
+            const { breakStartAt, nextClassAt } = defaultBreakPlan(planningNow(s));
+            s.plan = { ...s.plan, breakStartAt, nextClassAt };
+            s.planDraft.breakStartAt ??= '';
+            s.planDraft.nextClassAt ??= '';
+            s.timetable.applied = null;
+            s.timetable.appliedSaved = false;
+            s.quote = null;
+            s.chosen = {};
+            s.checkoutError = 'Your timetable changed. Choose a new break or enter your times manually.';
+            return true;
+        },
         click(target: HTMLElement): boolean {
             const action = target.dataset.action;
             if (!action?.startsWith('apspace-')) return false;
@@ -174,12 +215,6 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
             generation++;
             s.timetable = emptyTimetable();
         },
-        detach(): void {
-            s.timetable.applied = null;
-            s.timetable.status = '';
-            s.manualPlan = false;
-            s.planDraft = {};
-        },
         applyForm(form: HTMLFormElement): void {
             const values = new FormData(form);
             const breakStartAt = fromLocal(values.get('breakStartAt'));
@@ -190,10 +225,16 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
             }
             if (breakStartAt >= nextClassAt) throw new Error('Your break must start before the next commitment.');
             const updated = { ...preferences(form), breakStartAt, nextClassAt };
-            if (Object.keys(updated).some(key => updated[key as keyof BreakPlan] !== s.plan[key as keyof BreakPlan])) {
+            // The inputs have minute precision while a gap starting now may include seconds.
+            if (breakStartAt.slice(0, 16) !== s.plan.breakStartAt.slice(0, 16) ||
+                nextClassAt.slice(0, 16) !== s.plan.nextClassAt.slice(0, 16)) {
                 s.timetable.applied = null;
+                s.timetable.appliedSaved = false;
                 s.manualPlan = true;
                 s.timetable.status = '';
+            } else {
+                updated.breakStartAt = s.plan.breakStartAt;
+                updated.nextClassAt = s.plan.nextClassAt;
             }
             s.plan = updated;
             s.planDraft = {};
@@ -204,7 +245,8 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
             if (!s.fitBreak || !applied) return;
             const now = planningNow(s);
             const end = Date.parse(applied.endAt);
-            if (!owned(accepted) || s.plan.breakStartAt !== applied.startAt || s.plan.nextClassAt !== applied.endAt || now >= end || end > now + TIMETABLE_DAY) {
+            const validSource = s.timetable.appliedSaved ? savedBreakValid() : owned(accepted);
+            if (!validSource || s.plan.breakStartAt !== applied.startAt || s.plan.nextClassAt !== applied.endAt || now >= end || end > now + TIMETABLE_DAY) {
                 throw new Error('This imported break has expired or is no longer available. Choose a new gap or edit the times manually.');
             }
         },

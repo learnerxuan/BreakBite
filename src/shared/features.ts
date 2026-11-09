@@ -1,3 +1,5 @@
+import type { ApspaceConnection, ApspaceSource } from './model.js';
+
 /** Product contracts shared by the browser and the authoritative server. */
 export const ALLERGENS = ['peanuts', 'tree_nuts', 'milk', 'eggs', 'fish', 'shellfish', 'soy', 'sesame', 'wheat', 'gluten'] as const;
 export type Allergen = typeof ALLERGENS[number];
@@ -16,11 +18,24 @@ export interface FoodPreferences { diets: Diet[]; avoid: Allergen[]; hideUnsuita
 export interface SavedBasket {
     id: string; name: string; lines: { vendorId: string; itemId: string; quantity: number; name: string; priceSen: number; foodRevision?: string }[]; updatedAt: string;
 }
-export interface ClassEvent { id: string; uid: string; title: string; startAt: string; endAt: string; location: string; source: 'manual' | 'import'; }
+export interface ClassEvent { id: string; uid: string; title: string; startAt: string; endAt: string; location: string; source: 'manual' | 'import' | 'apspace'; }
 export interface TimetablePreview { id: string; events: ClassEvent[]; warnings: string[]; expiresAt: string; horizonEnd: string; }
+export interface ApspacePreview extends ApspaceSource {
+    id: string;
+    kind: 'connect' | 'update';
+    checkedAt: string;
+    expiresAt: string;
+    events: ClassEvent[];
+    affectedDates: string[];
+    selectedIds: string[];
+}
 export interface StudentProfile {
     favourites: string[]; usuals: SavedBasket[]; preferences: FoodPreferences;
     classes: ClassEvent[]; importedAt?: string; importHorizonEnd?: string; preview?: TimetablePreview;
+    apspace?: ApspaceConnection;
+    apspacePreview?: ApspacePreview;
+    apspaceGeneration?: string;
+    apspaceReviewed?: Record<string, string[]>;
 }
 export interface Notice { id: string; key: string; studentId: string; orderId: string; vendorId: string; message: string; at: string; readAt?: string; }
 export interface PickupPolicy { cutoffMinutes: number; cancellationMinutes: number; holdMinutes: number; delayGraceMinutes: number; }

@@ -4,11 +4,12 @@ import { money, time, atRisk, type Proposal, type PublicOrder } from '../../shar
 import type { ViewState } from '../state.js';
 import { art, esc, icon, localValue, short, statusLabel } from '../ui.js';
 import { timetableSection } from './timetable.js';
+import { savedBreaksSection } from './apspace.js';
 
 function breakForm(s: ViewState): string {
     const value = (name: string, fallback: string | number) => esc(s.planDraft[name] ?? fallback);
     return `<form id="plan-form" class="bb-plan">
-        ${s.timetable.applied ? '<p class="bb-small">Times from your APSpace timetable.</p>' : s.manualPlan ? '<p class="bb-small">Manually edited time preferences.</p>' : ''}
+        ${s.timetable.applied ? `<p class="bb-small">Times from your ${s.timetable.appliedSaved ? 'saved' : 'APSpace'} timetable.</p>` : s.manualPlan ? '<p class="bb-small">Manually edited time preferences.</p>' : ''}
         <label>Available from (MYT)<input id="plan-start" name="breakStartAt" type="datetime-local" step="0.001" value="${value('breakStartAt', localValue(s.plan.breakStartAt, true))}" required></label>
         <label>Next commitment (MYT)<input name="nextClassAt" type="datetime-local" step="0.001" value="${value('nextClassAt', localValue(s.plan.nextClassAt, true))}" required></label>
         <div class="bb-two"><label>Food budget (RM)<input name="budget" type="number" min="1" max="500" step=".01" value="${value('budget', s.plan.budgetSen / 100)}" required></label>
@@ -29,7 +30,7 @@ export function basket(s: ViewState): string {
     }).join('')}</section>`).join('')}
     ${ids.length ? `<div class="bb-total"><span>Estimated total</span><strong>${money(total)}</strong></div><p class="bb-small">Pay separately at each kitchen when you collect. No online charge.</p>` : ''}
     <label class="bb-toggle"><input id="fit-toggle" type="checkbox" ${s.fitBreak?'checked':''} ${s.uncertain?'disabled':''}> <span>Fit my break <small>Optional time and budget helper</small></span></label>
-    ${s.fitBreak ? timetableSection(s) + breakForm(s) : ''}
+    ${s.fitBreak ? savedBreaksSection(s, true) + (s.config?.apspaceConfigured && s.actor ? '' : timetableSection(s)) + breakForm(s) : ''}
     ${s.checkoutError ? `<p class="bb-error" role="alert">${esc(s.checkoutError)}</p>`:''}
     <button class="bb-button primary wide" data-action="review" ${!ids.length||s.busy?'disabled':''}>${s.busy?'Checking…':s.actor?'Choose pickup times':'Sign in to order'} ${icon('arrow')}</button>
     ${s.cart.length&&s.actor?'<button class="bb-text-button" data-action="save-usual">Save basket as a usual order</button>':''}

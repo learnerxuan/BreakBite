@@ -1,3 +1,11 @@
+# Automatic APSpace import verification — 9 November 2026
+
+- `npm run check` passed strict type checking, all 156 automated tests and the production build. APSpace tests cover source validation, shared caching and retry backoff, session ownership and consent, update review, missing dates, disconnect races and saved gap rendering.
+- `python tests/browser_apspace.py --base-url http://127.0.0.1:8101 --chromium <Edge executable>` passed over normal local HTTP using `node tests/setup-apspace-browser.mjs` and a disposable database. It covers manual intake-code entry, group selection, keyboard consent, persistence after reload, visible checkout preferences, atomic two-kitchen checkout recovery across a refresh, obsolete break removal, change review and disconnect. Layouts were checked at 360, 390, 768 and 1440 pixels.
+- `python tests/browser_product.py` and `python tests/browser_v3.py` passed on disposable servers over normal HTTP in Edge. The former also verified one real APSpace file in the fallback UI. The latter verified manual classes, the saved file import and independent QR decoding.
+- A local API run with `BREAKBITE_APSPACE=true` used the public upstream through options, preview, confirmation, profile and disconnect. A separate comparison matched all 32 start/end pairs in two intake exports for the week of 16 November. The upstream returned HTTP 304 on ETag revalidation.
+- Browser change and retry tests use a synthetic provider. Upstream publication cadence, multi-group parity across weeks, shared deployment terms, physical phone use and public deployment remain unverified. The real provider is off by default.
+
 # APSpace Fit my break verification — 9 November 2026
 
 | Check | Result |

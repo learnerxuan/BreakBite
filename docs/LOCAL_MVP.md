@@ -36,6 +36,16 @@ Starter allergen information is unknown. Operators can now supply reviewed ingre
 
 ## Use a break from APSpace
 
+For a qualified local pilot, set `BREAKBITE_APSPACE=true` in `.env` and restart. In **My planner**, choose **Connect APSpace timetable**, type the intake code shown in APSpace, choose the group, then review and confirm your classes. BreakBite saves the selection and timetable to your account. **Fit my break** shows the next confirmed gap and checks live pickup times when the basket contains food.
+
+The running server checks the source about every six hours when there are connected accounts. **Refresh now** can check sooner. Review changed classes before using affected dates. My planner shows the last successful check and date coverage. A failed check keeps the saved classes and hides affected suggestions. **Disconnect APSpace** removes the connection and its classes. Manually entered and file-imported classes are kept.
+
+The pilot uses a public intake timetable snapshot. Use the actual APSpace timetable to verify your classes. The publication schedule and terms for shared deployment are still being qualified. Automatic import is off by default. The saved **Import an .ics timetable** option in My planner is available as a fallback. Saved classes are also available in the basket.
+
+### Import a file for the current tab
+
+When automatic import is off, the basket also offers a file import that stays in the current tab.
+
 1. Open **Timetable** in APSpace. Select your **Intake**, the date for the intended week and your group when available. Press the calendar icon to download the `.ics` file.
 2. Sign in to BreakBite. In your basket, turn on **Fit my break** and choose the file under **Import APSpace timetable**.
 3. Check the dates, Malaysia times and overlaps. Untick classes that do not apply, confirm that the selection applies to you, then choose **Use selected classes**.
