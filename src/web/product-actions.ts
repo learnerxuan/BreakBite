@@ -2,7 +2,7 @@ import type { ViewState } from './state.js';
 import type { PublicOrder, RecoveryOption, Slot } from '../shared/model.js';
 import { api } from './client.js';
 import { fromLocal } from './ui.js';
-interface Hooks { work(fn: () => Promise<void>): Promise<void>; render(): void; refresh(): Promise<void>; invalidate(): void; notify(message: string, error?: boolean): void; }
+interface Hooks { work(fn: () => Promise<void>): Promise<void>; render(): void; refresh(): Promise<void>; invalidate(): void; notify(message: string, error?: boolean): void; detachTimetable(): void; }
 let stream: MediaStream | null = null;
 let scanGeneration = 0;
 export function stopCamera(): void { scanGeneration++; stream?.getTracks().forEach(t => t.stop()); stream = null; }
@@ -69,7 +69,7 @@ export function productActions(s: ViewState, h: Hooks) {
                 else if (action === 'read-notices') { await post('notices/read'); await h.refresh(); }
                 else if (action === 'delete-class') { await post('timetable/delete', { id }); await h.refresh(); }
                 else if (action === 'clear-classes') { if (!confirm('Delete all saved classes and the pending import preview?')) return; await post('timetable/delete', { all: true }); await h.refresh(); }
-                else if (action === 'use-break') { s.fitBreak = true; s.plan.breakStartAt = target.dataset.start!; s.plan.nextClassAt = target.dataset.end!; h.invalidate(); s.view = 'explore'; h.notify('Break applied. Review walking/eating times and live pickup availability.'); }
+                else if (action === 'use-break') { h.detachTimetable(); s.fitBreak = true; s.plan.breakStartAt = target.dataset.start!; s.plan.nextClassAt = target.dataset.end!; h.invalidate(); s.view = 'explore'; h.notify('Break applied. Review walking/eating times and live pickup availability.'); }
                 else if (action === 'help-order') {
                     s.earlier[id] = await post<{ slots: Slot[]; message: string }>('earlier/options', { vendorId, orderId: id });
                     s.recovery[id] = await post<{ options: RecoveryOption[]; message: string }>('assistance', { vendorId, orderId: id }); await h.refresh();

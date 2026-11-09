@@ -188,3 +188,20 @@ export const atRisk = (o: Pick<Order, 'estimatedReadyAt' | 'latestPickupAt' | 's
 export interface BasketGroup { vendorId: string; items: Selection[]; slotId?: string; }
 export interface BasketQuote { menuVersions?: Record<string, string>; groups: Quote[]; totalSen: number; reasons: string[]; }
 export interface CheckoutResult { id: string; orders: PublicOrder[]; totalSen: number; }
+export interface TimetableEvent {
+    id: string;
+    summary: string;
+    location: string;
+    startAt: string;
+    endAt: string;
+}
+
+export interface TimetableImport {
+    events: TimetableEvent[];
+    warnings: string[];
+}
+
+export interface TimetableBreak {
+    startAt: string;
+    endAt: string;
+}

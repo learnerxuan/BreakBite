@@ -1,7 +1,31 @@
 import type { StudentProfile, Notice, BookingLoad } from '../shared/features.js';
 import { emptyProfile } from '../shared/features.js';
-import type { Actor, AppConfig, BasketQuote, BreakPlan, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
+import type { Actor, AppConfig, BasketQuote, BreakPlan, MenuItem, RecoveryOption, Snapshot, TimetableBreak, TimetableImport, Vendor } from '../shared/model.js';
 export interface CartLine { vendorId: string; itemId: string; quantity: number; }
+interface AcceptedTimetable {
+    actorId: string;
+    fileName: string;
+    importedAt: string;
+    events: TimetableImport['events'];
+}
+export interface TimetableState {
+    accepted: AcceptedTimetable | null;
+    preview: (AcceptedTimetable & TimetableImport & { selected: Set<string>; consent: boolean }) | null;
+    date: string;
+    applied: TimetableBreak | null;
+    loading: boolean;
+    error: string;
+    status: string;
+}
+export const emptyTimetable = (): TimetableState =>
+    ({ accepted: null, preview: null, date: '', applied: null, loading: false, error: '', status: '' });
+
+export function defaultBreakPlan(now = Date.now()): BreakPlan {
+    const start = Math.ceil((now + 10 * 60000) / 300000) * 300000;
+    return { breakStartAt: new Date(start).toISOString(), nextClassAt: new Date(start + 60 * 60000).toISOString(),
+        walkToMinutes: 3, returnMinutes: 5, eatMinutes: 12, bufferMinutes: 3, budgetSen: 2500 };
+}
+
 export interface ViewState {
     profile: StudentProfile; notices: Notice[]; loads: BookingLoad[];
     detailItem: MenuItem | null; qr: { payload: string; code: string; kitchen: string } | null;
@@ -12,17 +36,20 @@ export interface ViewState {
     view: 'explore' | 'availability' | 'orders' | 'vendor' | 'saved' | 'planner' | 'inbox'; vendorTab: 'queue' | 'menu' | 'recovery' | 'settings';
     search: string; category: string; vendorFilter: string;
     fitBreak: boolean; plan: BreakPlan; quote: BasketQuote | null; chosen: Record<string, string>;
+    timetable: TimetableState; planDraft: Record<string, string>; manualPlan: boolean;
+    serverClock: { time: number; sampledAt: number } | null;
     transferMinutes: number; busy: boolean; offline: boolean;
     auth: 'login' | 'register' | null; authError: string; editing: MenuItem | 'new' | null;
     recovery: Record<string, { options: RecoveryOption[]; message: string }>;
     checkoutError: string; success: string; uncertain: boolean;
 }
 export function initialState(): ViewState {
-    const now = Date.now(); const start = Math.ceil((now + 10 * 60000) / 300000) * 300000;
     let cart: CartLine[] = [];
     try { const c: unknown = JSON.parse(sessionStorage.getItem('breakbite-cart-v2') ?? '[]'); if (Array.isArray(c) && c.length <= 25) cart = c.filter(x => x && typeof x.itemId === 'string' && typeof x.vendorId === 'string' && Number.isInteger(x.quantity) && x.quantity > 0 && x.quantity <= 5); } catch { /* Ignore an invalid client cache; the server validates everything. */ }
     return { profile: emptyProfile(), notices: [], loads: [], detailItem: null, qr: null, scanner: false, scanResult: null, scanPayload: "", basketMessages: [], earlier: {}, config: null, actor: null, snapshot: null, vendors: [], items: [], cart, view: 'explore', vendorTab: 'queue', search: '', category: 'All', vendorFilter: 'all', fitBreak: false,
-        plan: { breakStartAt: new Date(start).toISOString(), nextClassAt: new Date(start + 60 * 60000).toISOString(), walkToMinutes: 3, returnMinutes: 5, eatMinutes: 12, bufferMinutes: 3, budgetSen: 50000 },
+        plan: defaultBreakPlan(), planDraft: {}, manualPlan: false, timetable: emptyTimetable(), serverClock: null,
         quote: null, chosen: {}, transferMinutes: 2, busy: false, offline: false, auth: null, authError: '', editing: null, recovery: {}, checkoutError: '', success: '', uncertain: false };
 }
+export const planningNow = (s: ViewState): number => s.serverClock
+    ? Math.floor(s.serverClock.time + performance.now() - s.serverClock.sampledAt) : Date.now();
 export const cartKey = (vendorId: string, itemId: string): string => `${vendorId}:${itemId}`;

@@ -18,7 +18,7 @@ const icons: Record<string, string> = {
 export const icon = (name: string, cls = '') => `<svg class="icon ${cls}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] ?? icons.grid}</svg>`;
 export const art = (kind: MenuItem['art'], large = false) => `<div class="food-art art-${kind} ${large ? 'large' : ''}" aria-hidden="true"><div class="food-shadow"></div><div class="plate"><div class="grain"></div><div class="topping one"></div><div class="topping two"></div><div class="topping three"></div><div class="greens"></div><div class="garnish"></div></div><div class="art-dot dot-one"></div><div class="art-dot dot-two"></div></div>`;
 
-export const localValue = (iso: string): string => new Date(Date.parse(iso) + 8 * 3600000).toISOString().slice(0, 16);
+export const localValue = (iso: string, precise = false): string => new Date(Date.parse(iso) + 8 * 3600000).toISOString().slice(0, precise ? 23 : 16);
 export const fromLocal = (value: FormDataEntryValue | null): string => { const date = new Date(`${String(value)}+08:00`); if (!Number.isFinite(date.getTime())) throw new Error('Choose a valid date and time.'); return date.toISOString(); };
 export const short = (id: string): string => id.slice(0, 8).toUpperCase();
 export const statusLabel = (s: string): string => ({confirmed:'Confirmed',preparing:'Preparing',ready:'Ready to collect',collected:'Collected',cancelled:'Cancelled',uncollected:'Uncollected'}[s] ?? s.replaceAll('_',' '));

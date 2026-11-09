@@ -34,6 +34,18 @@ Starter allergen information is unknown. Operators can now supply reviewed ingre
 - Kitchens prepare independently. The student pays each counter separately; the operator scans the student's QR or enters the fallback code, then confirms payment received and handover.
 - Cancel each child independently before preparation and its agreed cancellation cutoff. Qualifying vendor delays allow an exception without a no-show penalty. No online charge/refund is performed.
 
+## Use a break from APSpace
+
+1. Open **Timetable** in APSpace. Select your **Intake**, the date for the intended week and your group when available. Press the calendar icon to download the `.ics` file.
+2. Sign in to BreakBite. In your basket, turn on **Fit my break** and choose the file under **Import APSpace timetable**.
+3. Check the dates, Malaysia times and overlaps. Untick classes that do not apply, confirm that the selection applies to you, then choose **Use selected classes**.
+4. Select a date and choose **Use this break**. Review the time and budget fields, then choose pickup times to check live availability. A gap describes free time between included classes. The next commitment must be within 24 hours to apply it.
+
+- Fit my break accepts UTF-8, version 2.0 `.ics` exports with dated UTC start and end times, up to 256 KiB and 500 entries. Recurrence, all-day events, local times and calendar updates require manual time entry.
+- The import timestamp shows when the file was read. Export again when classes change. **Replace timetable** opens a fresh preview. Cancelling or a failed file preserves the prior timetable. Confirming a replacement or removing the timetable clears any break still linked to it.
+- This import stays in the current browser tab and clears on refresh or sign-out. Checkout sends the selected break times and ordinary plan fields. **My planner** is the separate saved calendar feature.
+- You can enter times manually in Fit my break or turn it off for ordinary ordering.
+
 ## Delay and recovery
 
 - A kitchen can report an item-specific or kitchen-wide delay.

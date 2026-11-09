@@ -3,6 +3,21 @@ import { foodSummary, photo, favouriteStrip, policySummary } from './personal.js
 import { money, time, atRisk, type Proposal, type PublicOrder } from '../../shared/model.js';
 import type { ViewState } from '../state.js';
 import { art, esc, icon, localValue, short, statusLabel } from '../ui.js';
+import { timetableSection } from './timetable.js';
+
+function breakForm(s: ViewState): string {
+    const value = (name: string, fallback: string | number) => esc(s.planDraft[name] ?? fallback);
+    return `<form id="plan-form" class="bb-plan">
+        ${s.timetable.applied ? '<p class="bb-small">Times from your APSpace timetable.</p>' : s.manualPlan ? '<p class="bb-small">Manually edited time preferences.</p>' : ''}
+        <label>Available from (MYT)<input id="plan-start" name="breakStartAt" type="datetime-local" step="0.001" value="${value('breakStartAt', localValue(s.plan.breakStartAt, true))}" required></label>
+        <label>Next commitment (MYT)<input name="nextClassAt" type="datetime-local" step="0.001" value="${value('nextClassAt', localValue(s.plan.nextClassAt, true))}" required></label>
+        <div class="bb-two"><label>Food budget (RM)<input name="budget" type="number" min="1" max="500" step=".01" value="${value('budget', s.plan.budgetSen / 100)}" required></label>
+        <label>Time to eat (min)<input name="eatMinutes" type="number" min="0" max="60" value="${value('eatMinutes', s.plan.eatMinutes)}" required></label></div>
+        <details><summary>Walking and buffer</summary><div class="bb-three">
+        ${(['walkToMinutes', 'returnMinutes', 'bufferMinutes'] as const).map((k, i) => `<label>${['To food', 'Return', 'Buffer'][i]}<input name="${k}" type="number" min="${k === 'bufferMinutes' ? 1 : 0}" max="${k === 'bufferMinutes' ? 15 : 30}" value="${value(k, s.plan[k])}" required></label>`).join('')}
+        </div></details>
+        <button class="bb-button secondary" type="submit" ${s.uncertain ? 'disabled' : ''}>Apply time preferences</button></form>`;
+}
 
 export function basket(s: ViewState): string {
     const ids = [...new Set(s.cart.map(c => c.vendorId))];
@@ -13,8 +28,8 @@ export function basket(s: ViewState): string {
         return `<div class="bb-cart-line"><div><strong>${esc(i?.name ?? 'Unavailable item')}</strong><small>${i ? money(i.priceSen) : 'Remove this item'}</small></div><div class="bb-stepper"><button aria-label="Remove one ${esc(i?.name)}" data-action="minus" data-vendor="${esc(id)}" data-id="${esc(c.itemId)}">−</button><span>${c.quantity}</span><button aria-label="Add one ${esc(i?.name)}" data-action="plus" data-vendor="${esc(id)}" data-id="${esc(c.itemId)}">+</button></div></div>`;
     }).join('')}</section>`).join('')}
     ${ids.length ? `<div class="bb-total"><span>Estimated total</span><strong>${money(total)}</strong></div><p class="bb-small">Pay separately at each kitchen when you collect. No online charge.</p>` : ''}
-    <label class="bb-toggle"><input id="fit-toggle" type="checkbox" ${s.fitBreak?'checked':''}> <span>Fit my break <small>Optional time and budget helper</small></span></label>
-    ${s.fitBreak ? `<form id="plan-form" class="bb-plan"><label>Available from (MYT)<input name="breakStartAt" type="datetime-local" value="${localValue(s.plan.breakStartAt)}" required></label><label>Next commitment (MYT)<input name="nextClassAt" type="datetime-local" value="${localValue(s.plan.nextClassAt)}" required></label><div class="bb-two"><label>Food budget (RM)<input name="budget" type="number" min="1" max="500" step=".5" value="${s.plan.budgetSen === 50000 ? 25 : s.plan.budgetSen/100}" required></label><label>Time to eat (min)<input name="eatMinutes" type="number" min="0" max="60" value="${s.plan.eatMinutes}" required></label></div><details><summary>Walking and buffer</summary><div class="bb-three">${(['walkToMinutes','returnMinutes','bufferMinutes'] as const).map((k,i)=>`<label>${['To food','Return','Buffer'][i]}<input name="${k}" type="number" min="${k==='bufferMinutes'?1:0}" max="${k==='bufferMinutes'?15:30}" value="${s.plan[k]}" required></label>`).join('')}</div></details><button class="bb-button secondary" type="submit">Apply time preferences</button></form>`:''}
+    <label class="bb-toggle"><input id="fit-toggle" type="checkbox" ${s.fitBreak?'checked':''} ${s.uncertain?'disabled':''}> <span>Fit my break <small>Optional time and budget helper</small></span></label>
+    ${s.fitBreak ? timetableSection(s) + breakForm(s) : ''}
     ${s.checkoutError ? `<p class="bb-error" role="alert">${esc(s.checkoutError)}</p>`:''}
     <button class="bb-button primary wide" data-action="review" ${!ids.length||s.busy?'disabled':''}>${s.busy?'Checking…':s.actor?'Choose pickup times':'Sign in to order'} ${icon('arrow')}</button>
     ${s.cart.length&&s.actor?'<button class="bb-text-button" data-action="save-usual">Save basket as a usual order</button>':''}
