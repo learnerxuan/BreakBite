@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-tests/
 .data/
+.data-*/
 .env
 .env.*
 !.env.example

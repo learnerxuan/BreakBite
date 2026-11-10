@@ -1,4 +1,5 @@
 import { requireThat } from './errors.js';
+import { VENDOR_IDS } from './seed.js';
 export interface Settings {
     mode: 'demo' | 'firebase' | 'local';
     secureCookie: boolean;
@@ -29,7 +30,7 @@ function mapping(value: string | undefined, label: string): Record<string, strin
     }
     requireThat(parsed && typeof parsed === 'object' && !Array.isArray(parsed), 'CONFIG', `${label} must be an object.`, 500);
     for (const [key, id] of Object.entries(parsed))
-        requireThat(key.length > 0 && typeof id === 'string' && ['bowl-lab', 'noodle-co'].includes(id), 'CONFIG', `${label} contains an invalid vendor mapping.`, 500);
+        requireThat(key.length > 0 && typeof id === 'string' && VENDOR_IDS.includes(id as typeof VENDOR_IDS[number]), 'CONFIG', `${label} contains an invalid vendor mapping.`, 500);
     return parsed as Record<string, string>;
 }
 export function settings(env: NodeJS.ProcessEnv = process.env): Settings {

@@ -30,6 +30,7 @@ export const label = (s: string): string => s.replaceAll('_', ' ');
 export interface FoodCheck { suitable: boolean; reasons: string[]; }
 export function foodCheck(info: FoodInfo | undefined, p: FoodPreferences, now = Date.now()): FoodCheck {
     const reasons: string[] = [];
+    if ((p.avoid.length || p.diets.length) && info?.reviewedBy === 'sample-seed') reasons.push('Vendor review is required for this sample dietary information.');
     const evidenceCurrent = (e?: Evidence) => !!e?.reference && /^\d{4}-\d{2}-\d{2}$/.test(e.expiresOn) && Date.parse(`${e.expiresOn}T23:59:59+08:00`) >= now;
     if (p.avoid.length && (!info?.allergensKnown || !info.ingredients.trim())) reasons.push('Ingredient/allergen information is incomplete.');
     for (const a of p.avoid) if (info?.allergens.includes(a) || info?.mayContain.includes(a)) reasons.push(`${label(a)} is declared or may be present.`);

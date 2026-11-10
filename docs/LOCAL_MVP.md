@@ -17,12 +17,12 @@
 1. Run the application; browse the starter catalogue and register a student.
 2. Stop the server with Ctrl+C.
 3. Run `npm run operator`; enter a kitchen operator's name, email, kitchen ID and password.
-4. Repeat for `bowl-lab` and `noodle-co` as needed. Do not publish passwords in the repository.
+4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains the two original test kitchens and nine supplied-photo APU sample vendors. Do not publish passwords in the repository.
 5. Start again. Use separate browser profiles for the student and operators.
 6. Operators replace the sample menu information, prices, preparation times and pickup location in their workspace.
 7. Operators confirm the menu has been reviewed in Kitchen settings; this removes that kitchen's sample label. This is operator acknowledgement, not independent verification.
 
-Starter allergen information is unknown. Operators can now supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
+The added project-purpose menus contain sample ingredients, spice levels, warnings and AI-generated illustrative dish images, but are not vendor-confirmed. Supplied restaurant photographs are kept separately for future kitchen banners and are not presented as dish photos. Active dietary restrictions treat seed information as unreviewed. Operators can supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
 
 ## Main flow
 

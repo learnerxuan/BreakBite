@@ -72,6 +72,29 @@ export class LocalDatabase {
                 const data: unknown = JSON.parse(await readFile(this.file('database.json'), 'utf8'));
                 this.validate(data);
                 this.value = data;
+                // Add newly introduced sample kitchens without replacing existing operator data.
+                const migrated = structuredClone(this.value);
+                let changed = false;
+                for (const id of VENDOR_IDS) {
+                    if (!migrated.vendors[id]) { migrated.vendors[id] = seedVendor(id); changed = true; }
+                    else {
+                        const fresh = seedVendor(id);
+                        const vendor = migrated.vendors[id]!.vendor;
+                        if (vendor.location === `APU Food Court · ${fresh.vendor.name}`) {
+                            vendor.location = fresh.vendor.location;
+                            changed = true;
+                        }
+                        for (const item of migrated.vendors[id]!.items) {
+                            if (item.photoCredit !== 'Photo supplied by the project team; menu item shown may differ.') continue;
+                            const replacement = fresh.items.find(candidate => candidate.id === item.id);
+                            if (!replacement?.photoPath) continue;
+                            item.photoPath = replacement.photoPath;
+                            item.photoCredit = replacement.photoCredit;
+                            changed = true;
+                        }
+                    }
+                }
+                if (changed) { await this.persist(migrated, true); this.value = migrated; }
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
                 const vendors: Record<string, VendorState> = {};

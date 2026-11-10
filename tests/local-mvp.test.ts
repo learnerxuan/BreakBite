@@ -154,7 +154,10 @@ async function httpFixture(t:test.TestContext){
 }
 test('HTTP local mode exposes a browsable catalog but no account switcher or demo login',async t=>{
     const f=await httpFixture(t);const c=await f.request('/api/config');assert.equal(c.data.mode,'local');assert.deepEqual(c.data.demoIdentities,[]);
-    assert.equal((await f.request('/api/catalog')).data.items.length,10);
+    const catalog=await f.request('/api/catalog');assert.equal(catalog.data.items.length,55);
+    const locations=Object.fromEntries(catalog.data.vendors.map((vendor:{id:string;location:string})=>[vendor.id,vendor.location]));
+    assert.equal(locations['asian-cuisine'],'Cafeteria (Level 3)');assert.equal(locations.nelson,'Atrium (Level 3)');assert.equal(locations.subway,'Above Centre Point (Level 5)');assert.equal(locations.bobanika,'Above Centre Point (Level 5)');
+    const sample=f.db.read().vendors['asian-cuisine']!.items[0]!;assert.match(sample.photoPath!,/^\/images\/menu\/[a-z0-9-]+\.jpg$/);assert.match(sample.photoCredit!,/AI-generated illustrative sample/);
     assert.equal((await f.request('/api/state')).status,401);
     assert.equal((await f.request('/api/demo/login','POST',{id:'student-alex'})).status,404);
 });

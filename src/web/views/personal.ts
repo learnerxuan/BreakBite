@@ -10,7 +10,7 @@ export function foodSummary(i: MenuItem): string {
     return `<div class="bb-food-tags">${f?.diets.map(d => `<span>${esc(label(d))}${['halal', 'gluten_free'].includes(d) ? claim(d) : ''}</span>`).join('') ?? ''}${f && f.spice !== 'not_specified' ? `<span>${esc(label(f.spice))}</span>` : ''}</div><p class="bb-allergen-note">${f?.allergensKnown ? `Contains: ${f.allergens.length ? esc(f.allergens.map(label).join(', ')) : 'none declared by kitchen'}. ${f.mayContain.length ? `May contain: ${esc(f.mayContain.map(label).join(', '))}.` : ''}` : 'Allergen information not provided.'}</p>`;
 }
 export function photo(i: MenuItem): string {
-    return i.photoPath && /^\/media\/[a-f0-9]{64}\.(png|jpg|webp)$/.test(i.photoPath) ? `<img class="bb-food-photo" src="${esc(i.photoPath)}" alt="${esc(i.name)}" loading="lazy">` : art(i.art);
+    return i.photoPath && (/^\/media\/[a-f0-9]{64}\.(png|jpg|webp)$/.test(i.photoPath) || /^\/images\/(cafeterias|menu)\/[a-z0-9-]+\.jpg$/.test(i.photoPath)) ? `<img class="bb-food-photo" src="${esc(i.photoPath)}" alt="${esc(i.name)}" loading="lazy">` : art(i.art);
 }
 export function loadsView(s: ViewState, onlyVendor?: string, heading = 'Kitchen availability'): string {
     const loads = s.loads.filter(l => !onlyVendor || l.vendorId === onlyVendor);
