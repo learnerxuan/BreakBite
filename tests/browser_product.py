@@ -14,7 +14,7 @@ p=argparse.ArgumentParser();p.add_argument('--base-url',default='http://127.0.0.
 OUT=ROOT/'test-results'/'product';OUT.mkdir(parents=True,exist_ok=True)
 PASSWORD=os.environ.get('TEST_OPERATOR_PASSWORD','Fixture-only-password-2026')
 
-from browser_support import boot as boot_page, login, overflow
+from browser_support import boot as boot_page, login, overflow, open_basket, close_basket
 
 def boot(page):
     boot_page(page, args.base_url, args.bridge)
@@ -69,6 +69,7 @@ def timetable_fixture(name, title='TEST-CLASS'):
     return {'name': name, 'mimeType': 'text/calendar', 'buffer': '\r\n'.join(lines).encode()}, midnight.date(), next_start
 
 def test_timetable(page):
+    open_basket(page)
     fit = page.locator('#fit-toggle')
     fit.check()
     panel = page.locator('.bb-timetable')
@@ -107,8 +108,7 @@ def test_timetable(page):
     }''')
     budget.fill('31.75')
     eat.fill('9')
-    page.locator('#plan-form details summary').click()
-    page.get_by_label('Return', exact=True).fill('4')
+    expect(page.get_by_text('Walking and buffer', exact=True)).to_have_count(0)
     # Exercise the real browser file picker event in addition to selecting synthetic bytes.
     with page.expect_file_chooser() as picker:
         field.press('Enter')
@@ -125,7 +125,6 @@ def test_timetable(page):
     expect(confirm).to_be_enabled()
     expect(budget).to_have_value('31.75')
     expect(eat).to_have_value('9')
-    expect(page.get_by_label('Return', exact=True)).to_have_value('4')
     for width in [360, 390, 768, 1440]:
         page.set_viewport_size({'width': width, 'height': 900})
         overflow(page)
@@ -165,6 +164,7 @@ def test_timetable(page):
         expect(page.locator('button[data-view=inbox].active')).to_be_visible()
         page.evaluate('window.finishRead["slow-inbox.ics"]()')
         page.get_by_role('button',name='Explore',exact=True).click()
+        open_basket(page)
         expect(panel).not_to_contain_text('Reading timetable')
         expect(panel).to_contain_text('initial.ics')
 
@@ -213,10 +213,10 @@ with sync_playwright() as p:
     errors=[]
     def page(width=1440,height=1000):
         ctx=b.new_context(viewport={'width':width,'height':height});pg=ctx.new_page();pg.set_default_timeout(12000);pg.on('pageerror',lambda e:errors.append(str(e)));pg.on('dialog',lambda d:d.accept());boot(pg);return pg
-    student=page();expect(student.locator('.bb-meal')).to_have_count(55)
+    student=page();expect(student.locator('.bb-meal')).to_have_count(45)
     assert 'Local Demo Only' not in student.locator('body').inner_text();assert student.locator('input[name=nextClassAt]').count()==0
     overflow(student);student.screenshot(path=str(OUT/'home-desktop.png'),full_page=True)
-    student.get_by_role('button',name='Add Golden chicken rice',exact=True).click();student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()
+    student.get_by_role('button',name='Add Nasi lemak ayam',exact=True).click();student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
     expect(student.locator('.bb-cart-group')).to_have_count(2)
     student_email = f'student-{uuid.uuid4().hex[:8]}@example.test'
     login(student,student_email,register=True)
@@ -225,26 +225,27 @@ with sync_playwright() as p:
     student.get_by_role('button',name='Confirm all kitchen orders',exact=True).click();expect(student.locator('.bb-order')).to_have_count(2)
     codes=student.locator('.bb-pickup-code strong').all_inner_texts();assert len(set(codes))==2
     student.screenshot(path=str(OUT/'orders-desktop.png'),full_page=True)
-    op=page();login(op,'operator.bowl@example.test');expect(op.locator('[data-vendor-tab]')).to_have_count(4)
+    op=page();login(op,'operator.bowl@example.test');expect(op.locator('[data-vendor-tab]')).to_have_count(5)
     assert not any(c in op.locator('body').inner_text() for c in codes)
     expect(op.locator('.bb-order-grid').first.locator('.bb-order')).not_to_have_count(0)
-    op.get_by_role('button',name='Delays & recovery').click();op.locator('#incident-form select').select_option('chicken-rice');op.locator('#incident-form textarea').fill('Preparation unexpectedly delayed');op.locator('#incident-form input[type=number]').fill('20');op.get_by_role('button',name='Update affected orders').click()
+    op.get_by_role('button',name='Delays & recovery').click();op.locator('#incident-form select').select_option('nasi-lemak');op.locator('#incident-form textarea').fill('Preparation unexpectedly delayed');op.locator('#incident-form input[type=number]').fill('20');op.get_by_role('button',name='Update affected orders').click()
     op.get_by_role('button',name='Check alternatives').last.click();expect(op.get_by_role('button',name='Propose',exact=True).first).to_be_visible();op.get_by_role('button',name='Propose',exact=True).first.click();op.get_by_role('button',name='Approve for student').first.click()
     student.bring_to_front();expect(student.get_by_role('button',name='Accept alternative')).to_be_visible(timeout=15000);student.get_by_role('button',name='Accept alternative').click();expect(student.locator('#toast')).to_contain_text('Alternative accepted')
     new_codes=student.locator('.bb-pickup-code strong').all_inner_texts();assert set(codes)!=set(new_codes)
     student.set_viewport_size({'width':390,'height':844});student.screenshot(path=str(OUT/'orders-mobile.png'),full_page=True);overflow(student)
-    code=student.locator('.bb-order').filter(has=student.get_by_role('heading',name='Bowl Lab',exact=True)).locator('.bb-pickup-code strong').inner_text()
+    code=student.locator('.bb-order').filter(has=student.get_by_role('heading',name='Asian Cuisine',exact=True)).locator('.bb-pickup-code strong').inner_text()
     op.bring_to_front();op.get_by_role('button',name='Order queue',exact=True).click();op.get_by_role('button',name='Start preparing',exact=True).first.click();op.get_by_role('button',name='Mark ready',exact=True).first.click();form=op.locator('.bb-collect').first;form.locator('input[name=code]').fill(code);form.locator('input[type=checkbox]').check();form.get_by_role('button',name='Verify & complete pickup').click();expect(op.locator('#toast')).to_contain_text('Pickup completed')
     op.get_by_role('button',name='Menu & stock',exact=True).click();op.get_by_role('button',name='+ Add menu item',exact=True).click();expect(op.locator('#menu-dialog')).to_be_visible();op.get_by_label('Name',exact=True).fill('Kitchen special');op.get_by_label('Description',exact=True).fill('Operator-created menu item');op.get_by_label('Price (RM)',exact=True).fill('8.50');op.locator('input[name=foodConfirmed]').check();op.get_by_role('button',name='Save item',exact=True).click();expect(op.get_by_role('heading',name='Kitchen special',exact=True)).to_be_visible();op.set_viewport_size({'width':390,'height':844});overflow(op);op.screenshot(path=str(OUT/'vendor-mobile.png'),full_page=True)
     student.bring_to_front();student.get_by_role('button',name='Explore',exact=True).click();expect(student.locator('.bb-meal')).not_to_have_count(0);overflow(student);student.screenshot(path=str(OUT/'home-mobile.png'),full_page=True)
-    student.get_by_role('button',name='Add Sesame tofu bowl',exact=True).click()
-    student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()
+    student.get_by_role('button',name='Add Vegetable fried rice',exact=True).click()
+    student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
     fixture = test_timetable(student)
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(2)
     # A valid new selection replaces the effective plan and discards the open quote.
     student.locator('[data-action=apspace-use]').dispatch_event('click')
     expect(student.locator('#checkout-dialog')).to_have_count(0)
+    open_basket(student)
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(2)
     plans = student.evaluate('window.quotePlans')
@@ -252,6 +253,7 @@ with sync_playwright() as p:
     assert set(plans[-1]) == {'breakStartAt', 'nextClassAt', 'budgetSen', 'walkToMinutes',
                              'eatMinutes', 'returnMinutes', 'bufferMinutes'}
     assert plans[-1]['budgetSen'] == 3175 and plans[-1]['eatMinutes'] == 9
+    assert plans[-1]['walkToMinutes'] == plans[-1]['returnMinutes'] == plans[-1]['bufferMinutes'] == 0
     student.set_viewport_size({'width':390,'height':844})
     overflow(student);student.screenshot(path=str(OUT/'checkout-mobile.png'),full_page=True)
     # Lose one response after the actual server commit. The same request is recovered, not submitted twice.
@@ -274,6 +276,12 @@ with sync_playwright() as p:
     saved_attempt = lambda: student.evaluate('key => sessionStorage.getItem(key)', cache_key)
     attempt = saved_attempt()
     assert attempt and len(student.evaluate('window.committed.orders')) == 2
+    open_basket(student)
+    expect(student.locator('#mobile-break-button')).to_be_disabled()
+    student.locator('#mobile-break-button').dispatch_event('click')
+    close_basket(student)
+    assert saved_attempt() == attempt
+    open_basket(student)
     for selector in ['#apspace-file', '[data-action=apspace-use]', '[data-action=apspace-remove]', '#plan-form button[type=submit]']:
         control = student.locator(selector)
         expect(control).to_be_disabled()
@@ -282,16 +290,19 @@ with sync_playwright() as p:
     assert saved_attempt() == attempt
 
     # The original record survives sign-out; a different student can order normally.
+    close_basket(student)
     student.get_by_role('button', name='Sign out').click()
     expect(student.locator('#fit-toggle')).not_to_be_checked()
     login(student, f'other-{uuid.uuid4().hex[:8]}@example.test', register=True)
     expect(student.locator('.bb-pending')).to_have_count(0)
-    student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()
+    student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
+    open_basket(student)
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(1)
     assert student.evaluate('window.quotePlans.at(-1).mode') == 'pickup'
     student.locator('[data-action=close-checkout]').click()
     assert saved_attempt() == attempt
+    close_basket(student)
     student.get_by_role('button', name='Sign out').click()
     # Check the legacy unscoped key still works for an already-open tab after upgrading.
     student.evaluate('''key => {
@@ -304,7 +315,7 @@ with sync_playwright() as p:
     expect(student.locator('.bb-pending')).to_have_count(0)
     assert student.evaluate('sessionStorage.getItem("breakbite-checkout-v2")') is None
     assert student.evaluate('window.recovered.orders.map(o => o.id)') == student.evaluate('window.committed.orders.map(o => o.id)')
-    noodle_order = student.evaluate('window.recovered.orders.find(o => o.vendorId === "noodle-co")')
+    noodle_order = student.evaluate('window.recovered.orders.find(o => o.vendorId === "bobanika")')
     noodle_op = page()
     login(noodle_op, 'operator.noodle@example.test')
     noodle_id = noodle_order['id']
@@ -318,17 +329,20 @@ with sync_playwright() as p:
     student.bring_to_front()
     expect(student.locator('.bb-order').filter(has_text='Order ' + noodle_id[:8].upper())).to_contain_text('Collected')
     # Cancel only the fresh tofu order; the drink stays independently active.
-    tofu=student.locator('.bb-order').filter(has_text='Sesame tofu bowl').filter(has=student.get_by_role('button',name='Cancel this kitchen’s order'))
+    tofu=student.locator('.bb-order').filter(has_text='Vegetable fried rice').filter(has=student.get_by_role('button',name='Cancel this kitchen’s order'))
     tofu.get_by_role('button',name='Cancel this kitchen’s order').click()
     expect(student.locator('#toast')).to_contain_text('Kitchen order cancelled')
     student.get_by_role('button',name='Explore',exact=True).click()
+    open_basket(student)
     student.locator('#fit-toggle').check()
     expect(student.locator('.bb-timetable')).not_to_contain_text('initial.ics')
     student.locator('#apspace-file').set_input_files({**fixture, 'name':'slow-session.ics'})
     wait_until(lambda: student.evaluate('Boolean(window.finishRead["slow-session.ics"])'))
+    close_basket(student)
     student.get_by_role('button',name='Sign out').click()
     login(student, f'other-{uuid.uuid4().hex[:8]}@example.test', register=True)
     student.evaluate('window.finishRead["slow-session.ics"]()')
+    open_basket(student)
     student.locator('#fit-toggle').check()
     expect(student.locator('#apspace-preview')).to_have_count(0)
     expect(student.locator('.bb-timetable')).not_to_contain_text('slow-session.ics')
@@ -338,6 +352,7 @@ with sync_playwright() as p:
         student.locator('#apspace-confirm').click()
         student.reload(wait_until='networkidle')
         expect(student.locator('#fit-toggle')).not_to_be_checked()
+        open_basket(student)
         student.locator('#fit-toggle').check()
         expect(student.locator('.bb-timetable')).not_to_contain_text('initial.ics')
         student.locator('#apspace-file').set_input_files(fixture)
@@ -354,9 +369,11 @@ with sync_playwright() as p:
         expect(student.locator('.bb-timetable')).to_have_count(0)
         student.reload(wait_until='networkidle')
     if args.apspace_export:
+        open_basket(student)
         student.locator('#fit-toggle').check()
         for export in args.apspace_export:
             verify_apspace_export(student, export)
+    close_basket(student)
     for width in [360,768,1440]:student.set_viewport_size({'width':width,'height':1000});student.get_by_role('button',name='Explore',exact=True).click();overflow(student)
     assert not errors,errors
     print(json.dumps({'result':'PASS','transport':'local rendered code/API bridge' if args.bridge else 'browser HTTP','checks':['guest catalogue','student signup','multi-kitchen checkout','two pickup codes','operator isolation','delay and consent-based replacement','payment-confirmed collection','menu creation','390/360/768/1440 layouts','APSpace file selection, keyboard review, consent, polling and gap horizon','invalid, cancelled, overlapping async and successful replacements','manual edits and removal','timetable-derived quote, lost-response checkout recovery and pickup','sign-out and actor changes during import/recovery','per-kitchen cancellation','no JS errors'],'real_apspace_exports_checked':len(args.apspace_export),'screenshots':str(OUT)},indent=2))

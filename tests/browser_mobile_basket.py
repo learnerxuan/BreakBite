@@ -1,0 +1,90 @@
+"""Mobile basket access and draft preservation over real HTTP, using disposable data."""
+from __future__ import annotations
+import argparse
+from uuid import uuid4
+from playwright.sync_api import expect, sync_playwright
+from browser_support import ROOT, login, overflow
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--base-url', default='http://127.0.0.1:8110')
+parser.add_argument('--chromium')
+args = parser.parse_args()
+output = ROOT / 'test-results' / 'mobile-basket'
+output.mkdir(parents=True, exist_ok=True)
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True, executable_path=args.chromium)
+    page = browser.new_page(viewport={'width':390,'height':844}, is_mobile=True, has_touch=True)
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.goto(args.base_url)
+    expect(page.locator('.bb-meal')).to_have_count(45)
+    expect(page.locator('.bb-mobile-cart')).to_be_visible()
+    expect(page.locator('#basket')).to_be_hidden()
+    login(page, f'mobile-{uuid4().hex[:8]}@example.test', register=True)
+    page.locator('#mobile-break-button').click()
+    expect(page.locator('#mobile-basket-dialog')).to_be_visible()
+    expect(page.locator('#fit-toggle')).to_be_checked()
+    for _ in range(12):
+        page.keyboard.press('Tab')
+        assert page.evaluate("Boolean(document.activeElement.closest('#mobile-basket-dialog'))"), 'Focus escaped the sheet'
+    page.locator('#plan-form input[name=budget]').fill('19.50')
+    expect(page.get_by_text('Walking and buffer', exact=True)).to_have_count(0)
+    expect(page.locator('#plan-form input[name=walkToMinutes], #plan-form input[name=returnMinutes], #plan-form input[name=bufferMinutes]')).to_have_count(0)
+    page.locator('[data-action=close-basket]').click()
+    expect(page.locator('#mobile-break-button')).to_be_focused()
+    page.locator('.bb-mobile-cart').click()
+    expect(page.locator('#plan-form input[name=budget]')).to_have_value('19.50')
+    page.keyboard.press('Escape')
+    expect(page.locator('#mobile-basket-button')).to_be_focused()
+    expect(page.locator('#mobile-basket-dialog')).to_have_count(0)
+    page.get_by_role('button', name='Add Nasi lemak ayam', exact=True).click()
+    before = page.evaluate('scrollY')
+    page.locator('.bb-mobile-cart').click()
+    expect(page.locator('.bb-cart-group')).to_have_count(1)
+    page.get_by_role('button', name='Add one Nasi lemak ayam', exact=True).click()
+    expect(page.locator('.bb-stepper span')).to_have_text('2')
+    expect(page.locator('#plan-form input[name=budget]')).to_have_value('19.50')
+    page.locator('[data-action=close-basket]').click()
+    assert abs(page.evaluate('scrollY') - before) <= 1, 'Closing sheet moved the menu'
+    page.locator('.bb-mobile-cart').click()
+    page.locator('#fit-toggle').uncheck()
+    page.get_by_role('button', name='Choose pickup times', exact=True).click()
+    expect(page.locator('#checkout-dialog')).to_be_visible()
+    expect(page.locator('dialog[open]')).to_have_count(1)
+    page.keyboard.press('Escape')
+    expect(page.locator('#mobile-basket-dialog')).to_be_visible()
+    page.get_by_role('button', name='Remove one Nasi lemak ayam', exact=True).click()
+    page.get_by_role('button', name='Remove one Nasi lemak ayam', exact=True).click()
+    expect(page.locator('.bb-empty-mini')).to_be_visible()
+    expect(page.locator('#mobile-basket-dialog')).to_be_visible()
+    for width in [360,390,768]:
+        page.set_viewport_size({'width':width,'height':844})
+        overflow(page)
+        expect(page.locator('#mobile-basket-dialog')).to_be_visible()
+        box = page.locator('[data-action=close-basket]').bounding_box()
+        assert box['width'] >= 44 and box['height'] >= 44
+    page.set_viewport_size({'width':1440,'height':1000})
+    expect(page.locator('#mobile-basket-dialog')).to_have_count(0)
+    expect(page.locator('#basket')).to_be_visible()
+    expect(page.locator('.bb-mobile-cart')).to_be_hidden()
+    overflow(page)
+    page.set_viewport_size({'width':390,'height':844})
+    page.evaluate('scrollTo(0,0)')
+    expect(page.locator('#basket')).to_be_hidden()
+    page.screenshot(path=str(output / 'mobile-dock.png'))
+    page.locator('#mobile-break-button').click()
+    page.screenshot(path=str(output / 'mobile-break-sheet.png'))
+    guest = browser.new_page(viewport={'width':390,'height':844})
+    guest.goto(args.base_url)
+    guest.get_by_role('button', name='Add Nasi lemak ayam', exact=True).click()
+    guest.locator('.bb-mobile-cart').click()
+    guest.get_by_role('button', name='Sign in to order', exact=True).click()
+    expect(guest.locator('#auth-dialog')).to_be_visible()
+    expect(guest.locator('dialog[open]')).to_have_count(1)
+    guest.keyboard.press('Escape')
+    guest.locator('.bb-mobile-cart').click()
+    expect(guest.locator('.bb-stepper span')).to_have_text('1')
+    assert not errors, errors
+    browser.close()
+    print('PASS empty-basket access, Fit my break shortcut, draft preservation, no walking/buffer controls, focus and scroll return, quantities, single checkout modal, empty state, responsive sidebar/sheet and touch targets.')

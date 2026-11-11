@@ -8,7 +8,7 @@ import type { Settings } from './config.js';
 import { Auth } from './auth.js';
 import { Accounts } from './accounts.js';
 import { CheckoutService } from './checkout.js';
-import type { LocalDatabase } from './local-database.js';
+import type { Database } from './local-database.js';
 import { AppError, object, requireThat } from './errors.js';
 import { MealService } from './domain.js';
 import { DEMO_IDENTITIES, seedVendor } from './seed.js';
@@ -33,7 +33,7 @@ async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
         throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.');
     }
 }
-export function createApp(config: Settings, service: MealService, db?: LocalDatabase, notificationService?: PushService, productService?: ProductService) {
+export function createApp(config: Settings, service: MealService, db?: Database, notificationService?: PushService, productService?: ProductService) {
     const auth = new Auth(config);
     const push = notificationService ?? (db ? new PushService(db) : undefined);
     const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
@@ -81,17 +81,21 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 json(res, 200, { ok: true, version: '0.3.1', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
                 return;
             }
-            const key = req.socket.remoteAddress ?? 'unknown';
-            if (limits.size > 5000)
-                for (const [id, limit] of limits)
-                    if (limit.until < Date.now())
-                        limits.delete(id);
-            let limit = limits.get(key);
-            if (!limit || limit.until < Date.now()) {
-                limit = { count: 0, until: Date.now() + 60000 };
-                limits.set(key, limit);
+            // Catalogue images/modules must not spend the allowance reserved for API work.
+            if (pathname.startsWith('/api/') || pathname === '/mcp') {
+                const key = req.socket.remoteAddress ?? 'unknown';
+                if (limits.size > 5000)
+                    for (const [id, limit] of limits)
+                        if (limit.until < Date.now()) limits.delete(id);
+                let limit = limits.get(key);
+                if (!limit || limit.until < Date.now()) {
+                    limit = { count: 0, until: Date.now() + 60000 };
+                    limits.set(key, limit);
+                }
+                requireThat(++limit.count <= 300, 'RATE_LIMIT', 'Too many requests. Retry shortly.', 429);
             }
-            requireThat(++limit.count <= 300, 'RATE_LIMIT', 'Too many requests. Retry shortly.', 429);
+            // Refresh cached Firestore state before authenticated API work.
+            if (pathname.startsWith('/api/')) await db?.refresh();
             if (pathname === '/mcp') {
                 requireThat(req.method === 'POST', 'METHOD_NOT_ALLOWED', 'This stateless MCP endpoint accepts POST only.', 405);
                 const actor = await auth.agent(req);
@@ -114,7 +118,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 return;
             }
             if (config.mode === 'local' && pathname === '/api/catalog' && req.method === 'GET') {
-                const states = await Promise.all((await service.store.ids()).map(id => service.store.read(id)));
+                const states = (await Promise.all((await service.store.ids()).map(id => service.store.read(id)))).filter(s => !s.vendor.archived);
                 json(res, 200, { vendors: states.map(s => s.vendor), items: states.flatMap(s => s.items), loads: product?.loads() ?? [], serverTime: new Date().toISOString() });
                 return;
             }

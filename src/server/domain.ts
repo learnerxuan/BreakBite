@@ -1,6 +1,6 @@
 import { foodCheck, isClosed } from '../shared/features.js';
 import { parseFoodInfo, foodRevision } from './food.js';
-import { policies, parsePolicy, delayedCancellation } from './policy.js';
+import { policies, parsePolicy, delayedCancellation, availablePickupWindows } from './policy.js';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Actor, BreakPlan, MealPlan, MenuItem, Order, OrderLine, Proposal, PublicOrder, Quote, RecoveryOption, Selection, Slot, Snapshot, VendorState } from '../shared/model.js';
 import { atRisk } from '../shared/model.js';
@@ -29,7 +29,7 @@ export function parsePlan(input: unknown, now: number): MealPlan {
     const plan: BreakPlan = {
         breakStartAt: iso(p.breakStartAt, 'Break start'), nextClassAt: iso(p.nextClassAt, 'Next class'),
         walkToMinutes: integer(p.walkToMinutes, 'Walk to counter', 0, 30), eatMinutes: integer(p.eatMinutes, 'Eating time', 0, 60),
-        returnMinutes: integer(p.returnMinutes, 'Walk back', 0, 30), bufferMinutes: integer(p.bufferMinutes, 'Safety buffer', 1, 15),
+        returnMinutes: integer(p.returnMinutes, 'Walk back', 0, 30), bufferMinutes: integer(p.bufferMinutes, 'Safety buffer', 0, 15),
         budgetSen: integer(p.budgetSen, 'Budget in sen', 100, 50000),
     };
     requireThat(Date.parse(plan.nextClassAt) > now && Date.parse(plan.nextClassAt) <= now + 24 * 60 * MINUTE, 'INVALID_PLAN', 'Choose a class within the next 24 hours.');
@@ -60,6 +60,7 @@ function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan,
     const earliest = isBreak ? Math.max(now, Date.parse(plan.breakStartAt)) + plan.walkToMinutes * MINUTE : now;
     const ready = now + Math.max(...items.map(x => x.prepMinutes + delay(s, x.id))) * MINUTE;
     const reasons: string[] = [];
+    if (s.vendor.archived) reasons.push('This kitchen has been retired and no longer accepts new orders.');
     if (!s.vendor.open)
         reasons.push('This vendor has paused new orders.');
     if (totalSen > plan.budgetSen)
@@ -67,8 +68,8 @@ function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan,
     if (items.some((x, i) => !x.enabled || x.stock < selections[i]!.quantity))
         reasons.push('Some items are sold out or have insufficient stock.');
     if (latest <= earliest)
-        reasons.push('Your break does not leave enough time to walk, collect and eat.');
-    const slots = reasons.length ? [] : s.slots.filter(x => Date.parse(x.startAt) >= earliest && Date.parse(x.endAt) <= latest && Date.parse(x.endAt) >= ready && Date.parse(x.startAt) - policies(s.vendor).cutoffMinutes * MINUTE > now && x.reservedUnits + units <= x.kitchenCapacity && x.reservedHandovers + 1 <= x.pickupCapacity);
+        reasons.push('Your break does not leave enough time to collect and eat.');
+    const slots = reasons.length ? [] : availablePickupWindows(s, now, units, ready, earliest, latest);
     if (!slots.length && !reasons.length)
         reasons.push('No pickup window fits the current preparation time and available capacity. Choose another time or meal.');
     return { vendorId: s.vendor.id, totalSen, earliestPickupAt: stamp(earliest), latestPickupAt: stamp(latest), slots: structuredClone(slots), reasons };
@@ -123,7 +124,7 @@ export class MealService {
         const visibleOrders = actor.role === 'student' ? states.flatMap(s => s.orders.filter(o => o.studentId === actor.id)) : owned.flatMap(s => s.orders);
         const proposals = actor.role === 'student' ? states.flatMap(s => s.proposals.filter(p => p.studentId === actor.id && p.status !== 'pending_vendor')) : owned.flatMap(s => s.proposals);
         return {
-            actor, vendors: states.map(s => s.vendor), items: states.flatMap(s => s.items),
+            actor, vendors: states.map(s => s.vendor), items: states.filter(s => !s.vendor.archived || (actor.role === 'vendor' && s.vendor.id === actor.vendorId)).flatMap(s => s.items),
             slots: states.flatMap(s => s.slots.map(slot => ({ ...slot, vendorId: s.vendor.id }))),
             orders: visibleOrders.map(o => safeOrder(o, actor)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
             proposals: proposals.map(p => ({ ...p, status: ['approved', 'pending_vendor'].includes(p.status) && Date.parse(p.expiresAt) <= this.clock() ? 'expired' : p.status })),
@@ -160,6 +161,7 @@ export class MealService {
             const { lines } = linesFor(s, selections);
             reserve(s, lines, slot.id);
             const order: Order = {
+                preparationBaseline: { minutes: Math.max(...selections.map(line => s.items.find(item => item.id === line.itemId)!.prepMinutes)), pickupStartAt: slot.startAt, orderedAt: stamp(now) },
                 id: randomUUID(), studentId: actor.id, vendorId, lines, totalSen: quote.totalSen, slotId,
                 plan, latestPickupAt: 'nextClassAt' in plan ? quote.latestPickupAt : slot.endAt, earliestPickupAt: quote.earliestPickupAt,
                 estimatedReadyAt: slot.endAt, status: 'confirmed', version: 1,
@@ -267,7 +269,7 @@ export class MealService {
     async setOpen(actor: Actor, vendorId: string, input: unknown): Promise<void> {
         operator(actor, vendorId);
         const open = bool(object(input).open, 'Open status');
-        await this.store.transact(vendorId, s => { s.vendor.open = open; audit(s, actor, 'vendor.open', vendorId, open ? 'New orders enabled.' : 'New orders paused.', this.clock()); });
+        await this.store.transact(vendorId, s => { requireThat(!open || !s.vendor.archived, 'KITCHEN_RETIRED', 'This kitchen is retired. Existing orders can still be fulfilled.', 409); s.vendor.open = open; audit(s, actor, 'vendor.open', vendorId, open ? 'New orders enabled.' : 'New orders paused.', this.clock()); });
     }
     async updateVendor(actor: Actor, vendorId: string, input: unknown): Promise<void> {
         operator(actor, vendorId); const b = object(input);
@@ -455,6 +457,7 @@ export class MealService {
             reserve(s, lines, option.slotId);
             order.lines = lines;
             order.slotId = option.slotId;
+            order.preparationBaseline = { minutes: s.items.find(item => item.id === option.itemId)!.prepMinutes, pickupStartAt: getSlot(s, option.slotId).startAt, orderedAt: stamp(this.clock()) };
             order.totalSen = option.totalSen;
             order.estimatedReadyAt = option.readyAt;
             if (!('nextClassAt' in order.plan)) order.latestPickupAt = option.readyAt;

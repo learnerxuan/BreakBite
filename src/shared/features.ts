@@ -58,6 +58,9 @@ export function foodCheck(info: FoodInfo | undefined, p: FoodPreferences, now = 
 }
 export interface BookingLoad {
     vendorId: string; updatedAt: string; open: boolean; nextAvailableAt: string | null;
+    activity?: { scheduled: number; preparing: number; ready: number };
+    delayed?: boolean;
+    itemEstimates?: { itemId: string; startAt: string; endAt: string }[];
     slots: { id: string; startAt: string; endAt: string; level: 'available' | 'filling' | 'full' | 'closed'; percent: number }[];
 }
 export function isClosed(status: string): boolean { return ['collected', 'cancelled', 'uncollected'].includes(status); }

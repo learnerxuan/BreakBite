@@ -2,11 +2,11 @@
 ## Order ahead. Enjoy your break.
 
 - **Track:** Smart Campus & Student Experience.
-- **Current version:** v0.3.1 — a working website with local accounts and persistent JSON storage.
+- **Current version:** v0.3.1 — a working website with local accounts and persistent JSON or optional Firestore storage.
 - **For APU students:** an independent student project, not an official campus service.
 - Browse before arriving, order from multiple kitchens, choose realistic pickup windows and collect separately.
 - Ordinary ordering works without a timetable. **Fit my break** is optional.
-- Google Cloud/Firebase migration and actual Gemini Enterprise integration remain deferred.
+- Optional Firestore storage (`STORE=firestore`) is implemented; this integration was checked with the official emulator. Live-project credentials/rules, public hosting and Gemini Enterprise integration remain separate validation.
 
 ## Run
 
@@ -35,10 +35,11 @@ npm start
 | Saved meals | Favourites, recently ordered meals, named usual baskets, rename/remove and repeat ordering with current prices, food information and fresh slots. |
 | Food information | Vendor-entered ingredients, spice, dietary declarations, contains/may-contain warnings and evidence references; saved student restrictions and explicit unknown states. |
 | Campus content | Editable kitchen campus/location/menu source, permission-confirmed local photograph uploads, responsive APU-focused interface. |
-| Availability | Dedicated **Availability** tab, separate from Explore. Current online kitchen/counter allocation and next available windows; no claim to measure the physical queue or predict demand. |
+| Availability | Dedicated **Availability** tab, separate from Explore. Online preparing/scheduled/ready counts, kitchen status and meal-specific pickup estimates; no claim to measure physical queues or cooking progress. |
 | Collection policies | Configurable ordering/cancellation cutoffs, snapshotted order rules, server-generated ready/due/overdue reminders, merchant-confirmed uncollected closure and corrections. |
 | Timetable | Manual classes and `.ics` imports, plus opt-in APSpace import by typed intake code and group. Review classes once, then use saved gaps in the planner or basket. Changes require review. |
 | Deadline help | Move a not-yet-preparing order into genuinely free earlier capacity, or request reviewed alternatives. Other students are never pushed back. |
+| Time saved | Prominent, private estimate of preparation wait avoided on collected checkouts; snapshotted preparation times, lateness adjustment and no double counting across parallel kitchens. |
 | Kitchen operations | Menu/stock editing, preparation queue, pause/reopen, capacity settings, delays, consent-based alternatives, collection and operation history. |
 
 ## Important workflow rules
@@ -68,10 +69,18 @@ npm start
 
 ## Real campus data
 
-- The starter catalogue includes the two original test kitchens plus nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus and ingredients remain labelled sample content until reviewed.
+- The starter catalogue includes nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus, ingredients and illustrative images remain sample data until reviewed; visible card badges are hidden at the project owner's request.
 - Operators can replace menus, upload owned/licensed photographs, record the review source and confirm their kitchen data.
-- Do not remove sample labels merely to imply deployment. Obtain actual vendor confirmation first.
+- Card sample badges are hidden at the project owner's request; seed provenance remains stored. Obtain actual vendor confirmation before claiming menus, dietary information or images are verified.
 - No fabricated nutrition, halal certification, allergy guarantees, time-saving percentage or university endorsement.
+
+## Estimated time saved
+
+- Explore and My orders show your estimated preparation wait avoided, counted only after collection. The basket previews the potential estimate.
+- Per kitchen: preparation minutes saved at checkout minus readiness lateness after the booked pickup start, capped at the order-ahead lead time and rounded down. A replacement starts its lead time when accepted.
+- Each checkout contributes its largest kitchen estimate because kitchens may prepare simultaneously. Cancelled/uncollected orders and older orders without a baseline contribute nothing.
+- Queue, walking and counter-payment time are excluded. This is an explained estimate, not measured campus time savings.
+- Bowl Lab and Noodle & Co. are retired. Existing accounts/orders and retry records remain usable for history and outstanding collection; new installs have nine kitchens and 45 sample items.
 
 ## Storage and security
 
@@ -79,6 +88,7 @@ npm start
 - `.data/media/`: uploaded raster photographs; include this directory in private backups.
 - Single-process lock, serialized draft transaction, flushed temporary file and atomic rename protect multi-kitchen writes.
 - Previous JSON snapshot is retained; it is not a complete backup strategy. No multiple replicas/shared filesystem.
+- **Firestore option:** `STORE=firestore` keeps the same data in Cloud Firestore, with one atomic, conflict-checked commit per change, so several server processes can share it. See [Firestore storage](docs/FIRESTORE.md).
 - Salted scrypt passwords, hashed opaque sessions, HttpOnly cookies, CSRF protection, server-side role/ownership checks and rate limits.
 - The optional v0.3 fields migrate in place; existing accounts/orders remain. Legacy ready orders without a timestamp receive a fresh grace period when first observed.
 - Email verification/reset delivery, distributed abuse protection, independent security audit and campus-scale performance are not completed.
@@ -99,13 +109,15 @@ src/web/views/             Student, kitchen and personal pages
 src/web/product-actions.ts  Camera, photo, saved meal and timetable interactions
 ```
 
-TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm dependencies.
+TypeScript/native browser modules + CSS + Node.js; **not React**. One runtime npm dependency, `firebase-admin`, loaded only when `STORE=firestore`.
 
 ## Verification and guides
 
-- `npm run check`: type checking, **160 automated tests**, production build.
+- `npm run check`: type checking, **202 automated tests** (201 pass; one opt-in live Firestore test is skipped by default), production build.
+- `npm run test:firestore-memory` / `test:firestore-suite`: the same suite on an in-memory Firestore stand-in or a real Firestore database. See [Firestore storage](docs/FIRESTORE.md#tests).
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
+- [Firestore storage](docs/FIRESTORE.md)
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)
 - [v0.3 features and review guide](docs/RELEASE_0_3.md)
 - [Test results and limitations](docs/TEST_REPORT.md)
@@ -113,3 +125,5 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm
 - [Implemented architecture](docs/IMPLEMENTATION.md)
 - [API](docs/API.md)
 - [Future Google/Gemini setup](docs/MANUAL_SETUP.md)
+
+- [Functional UAT checklist and sign-off](docs/UAT.md): 34 manual scenarios; physical-device acceptance is recorded separately from automated checks.

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { addLegacyTestKitchens } from './fixtures.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -6,6 +7,7 @@ import path from 'node:path';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { LocalDatabase, LocalStore, accountActor } from '../src/server/local-database.js';
+import { jsonFile, storedText, testDatabase } from './support/test-database.js';
 import { Accounts } from '../src/server/accounts.js';
 import { CheckoutService } from '../src/server/checkout.js';
 import { MealService } from '../src/server/domain.js';
@@ -20,7 +22,7 @@ const bowl: Actor = { id: 'op-bowl', name: 'Bowl operator', role: 'vendor', vend
 const noodle: Actor = { id: 'op-noodle', name: 'Noodle operator', role: 'vendor', vendorId: 'noodle-co' };
 const isCode = (code: string) => (e: unknown) => e instanceof AppError && e.code === code;
 async function fixture(t: test.TestContext) {
-    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v2-')); const db=new LocalDatabase(dir);await db.open();
+    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v2-')); const db=testDatabase(dir);await db.open();await addLegacyTestKitchens(db);
     t.after(async()=>{await db.close();await rm(dir,{recursive:true,force:true});});
     const store=new LocalStore(db); const service=new MealService(store,Date.now,'pay_at_pickup');const checkout=new CheckoutService(db);
     const groups: BasketGroup[]=[{vendorId:'bowl-lab',items:[{itemId:'chicken-rice',quantity:1}],slotId:db.read().vendors['bowl-lab']!.slots[0]!.id},{vendorId:'noodle-co',items:[{itemId:'lemon-water',quantity:1}],slotId:db.read().vendors['noodle-co']!.slots[1]!.id}];
@@ -146,21 +148,21 @@ test('collection requires the code, payment confirmation and the correct operato
 });
 test('JSON checkout survives close/reopen and retains a previous snapshot',async t=>{
     const f=await fixture(t);const c=await f.checkout.submit(alex,f.payload,'restart-key-123');await f.db.close();
-    const reopened=new LocalDatabase(f.dir);await reopened.open();
-    try{assert.equal(new CheckoutService(reopened).lookup(alex,'restart-key-123')!.id,c.id);assert.ok(JSON.parse(await readFile(path.join(f.dir,'database.previous.json'),'utf8')).schemaVersion===2);}
+    const reopened=testDatabase(f.dir);await reopened.open();
+    try{assert.equal(new CheckoutService(reopened).lookup(alex,'restart-key-123')!.id,c.id);if(jsonFile)assert.ok(JSON.parse(await readFile(path.join(f.dir,'database.previous.json'),'utf8')).schemaVersion===2);}
     finally{await reopened.close();}
 });
-test('JSON storage refuses a second writer',async t=>{
+test('JSON storage refuses a second writer',{skip:!jsonFile&&'JSON-file lock only; Firestore allows several processes'},async t=>{
     const f=await fixture(t);await assert.rejects(new LocalDatabase(f.dir).open(),isCode('STORE_LOCKED'));
 });
-test('corrupt JSON is not silently reseeded or replaced',async t=>{
+test('corrupt JSON is not silently reseeded or replaced',{skip:!jsonFile&&'JSON-file handling only'},async t=>{
     const f=await fixture(t);await f.db.close();await writeFile(path.join(f.dir,'database.json'),'{broken');
     await assert.rejects(new LocalDatabase(f.dir).open());assert.equal(await readFile(path.join(f.dir,'database.json'),'utf8'),'{broken');
 });
 test('registration hashes passwords and does not accept self-assigned vendor roles',async t=>{
     const f=await fixture(t);const accounts=new Accounts(f.db);const a=await accounts.register({name:'Student A',email:'A@Example.test',password:'A-strong-password-123'});
     assert.equal(a.role,'student');assert.equal(a.email,'a@example.test');
-    assert.ok(!(await readFile(path.join(f.dir,'database.json'),'utf8')).includes('A-strong-password-123'));
+    assert.ok(!(await storedText(f.db)).includes('A-strong-password-123'));
     await assert.rejects(accounts.register({name:'Attacker',email:'x@example.test',password:'A-strong-password-123',role:'vendor'}),isCode('INVALID_ROLE'));
     await assert.rejects(accounts.register({name:'Student A',email:'a@example.test',password:'A-strong-password-123'}),isCode('EMAIL_EXISTS'));
 });
@@ -227,8 +229,8 @@ test('HTTP rejects cross-site writes, legacy bypass routes and cross-kitchen cha
 });
 test('session data persists across database reopen; plaintext tokens are not stored',async t=>{
     const f=await httpFixture(t);const reg=await f.request('/api/auth/register','POST',{name:'Persistent student',email:'p@example.test',password:'Persistent-password-123'});
-    const token=f.cookie().split('=')[1]!;assert.ok(!(await readFile(path.join(f.dir,'database.json'),'utf8')).includes(token));
-    await f.db.close();const db=new LocalDatabase(f.dir);await db.open();
+    const token=f.cookie().split('=')[1]!;assert.ok(!(await storedText(f.db)).includes(token));
+    await f.db.close();const db=testDatabase(f.dir);await db.open();
     try{const accounts=new Accounts(db);const req={method:'GET',headers:{cookie:f.cookie()}} as import('node:http').IncomingMessage;assert.equal(accounts.session(req).actor.id,reg.data.actor.id);}
     finally{await db.close();}
 });

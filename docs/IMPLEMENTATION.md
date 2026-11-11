@@ -7,8 +7,9 @@
 
 - Native TypeScript/CSS browser modules and Node HTTP backend.
 - `AUTH_MODE=local`, `STORE=file`; cookie-authenticated accounts and persistent JSON.
-- A single locked database stores all kitchens. A checkout validates all children and writes one atomic file replacement, or commits nothing.
-- Legacy cloud/MCP adapters remain migration code. The product UI deliberately requires local mode until cloud multi-kitchen transactions are implemented and tested.
+- Optional `STORE=firestore`: the same `LocalData` in Cloud Firestore through `firebase-admin`, one document per record, one atomic commit per change and a ROOT updateTime precondition for cross-process safety. See [FIRESTORE.md](FIRESTORE.md).
+- The JSON backend locks one file; the Firestore backend uses a shared ROOT version precondition. A checkout commits all child reservations atomically or none.
+- The product UI requires AUTH_MODE=local for cookie accounts with either supported store. Legacy Firebase-auth/MCP adapters are separate from this UI.
 
 ## Transaction and identity boundaries
 
@@ -48,18 +49,18 @@
 
 ## Time, policy and notices
 
-- Normal ordering has no class requirement. Fit my break adds optional walking/eating/return/buffer constraints.
+- Normal ordering has no class requirement. Fit my break optionally checks the selected break, food budget and eating time. The UI no longer asks for walking/return/buffer allowances; new plans send zero for those legacy contract fields. Historical plans and pending checkout payloads remain readable.
 - Kitchen workload and counter handover capacity are separate online allocations. Walk-in demand must be reserved by merchants.
 - New-order cutoff uses pickup start; normal cancellation requires both not preparing and before the snapshotted cancellation cutoff.
 - Vendor lateness beyond the agreed allowance enables no-strike cancellation; prepared ingredients are not returned to stock.
 - Ready captures actual time. Grace ends at max(actual Ready, booked window end) + agreed hold duration.
-- A server timer runs every 15 seconds and creates deduplicated private inbox notices. Late/overdue state does not depend on a student leaving the website open.
+- A server timer runs every 15 seconds and creates deduplicated private inbox notices, including unreported overdue preparation even when there are no ready orders. Late/overdue state does not depend on a student leaving the website open.
 - Overdue orders remain collectable until a merchant closes them with a reason. No automatic bans/fees, inventory restoration or retroactive capacity release.
 - Opt-in background Web Push uses a durable queue and a push-only service worker. Real closed-tab device delivery remains unverified; email/SMS are not implemented.
 
 ## Availability and earlier assistance
 
-- Booking indicators use the larger of kitchen and counter allocation usage. Labels show Available/Filling/Full/Closed and update time.
+- Public kitchen summaries expose only aggregate confirmed/scheduled, preparing and ready counts, a delay flag and one-portion per-item pickup estimates. `availablePickupWindows` is shared with actual quotes and checks kitchen workload, counter capacity, prep/delays and cutoff. Predictions never reserve slots or expose order/student identities. The browser hides live estimates after connectivity loss/staleness; checkout remains authoritative for actual basket quantities and restrictions.
 - They do not measure physical lines or predict historical peaks.
 - Earlier-slot selection rechecks free capacity, current price/workload/food review and sibling timings atomically.
 - No other customer's reservation is displaced. If no suitable slot exists, preserve the original order.
@@ -74,6 +75,13 @@
 - An opt-in APSpace pilot uses a fixed public intake feed. The student types their intake code, selects the group and confirms an account-owned preview. A shared server cache checks for changes and stages affected dates for review. The basket uses confirmed gaps from the saved planner.
 - An unavailable source or unconfirmed change suppresses affected suggestions. A refresh preserves checkout retry records and accepted orders. The provider uses public timetable rows without requiring APSpace credentials.
 - Timetable gaps populate an optional break plan, not a capacity guarantee.
+
+## Estimated preparation wait avoided
+
+- New orders snapshot the longest menu preparation estimate, pickup start and effective ordering time. Accepted replacements refresh the baseline; earlier moves refresh the pickup start.
+- `shared/savings.ts` counts only collected, student-owned orders: max(0, min(order-ahead lead, prep estimate minus readiness lateness)), in whole minutes. Each checkout contributes its largest child value.
+- Totals are derived on the server from durable orders, so visits, retries and pickup replay cannot increment them. Old records without a baseline remain excluded. Queue/walking/payment savings are not measured.
+- Archived legacy kitchens are excluded from the catalogue, menu and availability. Their order records, credentials for outstanding collection and idempotency history remain intact.
 
 ## Browser and operational limits
 

@@ -9,7 +9,7 @@
 - Source checkout: `npm install`, `npm run check`, `npm start`.
 - Prebuilt package: `npm start`.
 - Open `http://127.0.0.1:8080` in a normal browser.
-- Default mode is `AUTH_MODE=local`, with JSON storage and real account authentication.
+- Default mode is `AUTH_MODE=local`, with JSON storage and real account authentication. Optional Firestore storage uses the same accounts/API; see [FIRESTORE.md](FIRESTORE.md). New Firestore roots do not import local accounts/orders.
 - An old `.env` containing `AUTH_MODE=demo` must be updated. Demo impersonation remains a legacy test harness, not the product UI.
 
 ## First usable installation
@@ -17,20 +17,24 @@
 1. Run the application; browse the starter catalogue and register a student.
 2. Stop the server with Ctrl+C.
 3. Run `npm run operator`; enter a kitchen operator's name, email, kitchen ID and password.
-4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains the two original test kitchens and nine supplied-photo APU sample vendors. Do not publish passwords in the repository.
+4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains nine supplied-photo APU sample vendors. Bowl Lab and Noodle & Co. are retired; existing orders are preserved. Do not publish passwords in the repository.
 5. Start again. Use separate browser profiles for the student and operators.
 6. Operators replace the sample menu information, prices, preparation times and pickup location in their workspace.
-7. Operators confirm the menu has been reviewed in Kitchen settings; this removes that kitchen's sample label. This is operator acknowledgement, not independent verification.
+7. Operators confirm the menu has been reviewed in Kitchen settings. This updates stored review status; hidden card badges do not imply review or independent verification.
 
 The added project-purpose menus contain sample ingredients, spice levels, warnings and AI-generated illustrative dish images, but are not vendor-confirmed. Supplied restaurant photographs are kept separately for future kitchen banners and are not presented as dish photos. Active dietary restrictions treat seed information as unreviewed. Operators can supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
 
 ## Main flow
 
+- On phones/tablets, the fixed **Your basket** and **Fit my break** shortcuts open a bottom sheet, including when the basket is empty. Close it to continue browsing; basket contents and time drafts are preserved. Desktop keeps the basket sidebar.
+- Fit my break asks for your break times, food budget and eating time. Walking and buffer controls are removed. The time-saved panel estimates food preparation waiting avoided; it is independent of these preferences.
+- Kitchen operators use **Close kitchen** to hide food from student browsing and stop new orders; **Reopen kitchen** restores it. Closure persists until manually reopened. Existing orders remain actionable. Finished orders are in the **Order history** table, with collected/cancelled/uncollected status, amounts and dated updates. Filter by order/checkout ID, status or updated date (MYT).
+- Availability shows Open/Delayed/Closed kitchen status, anonymous online preparing/scheduled/ready counts and the earliest estimated pickup. Menu cards show per-meal estimates for one portion, using the same preparation/delay/capacity/cutoff rules as checkout. Estimates do not reserve anything; the full basket is checked at checkout. Offline/stale status is explicitly unavailable. Walk-ins and cooking progress are not measured.
 - Add food from one kitchen and a drink from another to the same basket.
 - Choose a pickup window for each kitchen. The default suggestion staggers windows.
 - Set a realistic walking time between counters. One minute per handover is also reserved in the itinerary check.
 - Confirm once. All child reservations either succeed together or fail together.
-- View the checkout in My orders, with an individual status/code/amount for each kitchen.
+- View the checkout in My orders, with an individual status/code/amount for each kitchen. After collection, your estimated preparation wait avoided appears above the orders and on Explore; open its explanation for the assumptions.
 - Kitchens prepare independently. The student pays each counter separately; the operator scans the student's QR or enters the fallback code, then confirms payment received and handover.
 - Cancel each child independently before preparation and its agreed cancellation cutoff. Qualifying vendor delays allow an exception without a no-show penalty. No online charge/refund is performed.
 
@@ -139,3 +143,7 @@ COOKIE_SECURE=false
 - Save preferences, favourites/usual orders and optional timetables through the student pages. Imported calendars are private snapshots, not APSpace live sync.
 - Photos are saved locally in `.data/media/`. The source repository must never contain private data or unauthorised photographs.
 - Public hosting and closed-browser push delivery are not completed by running the local server.
+
+## Manual acceptance
+
+Use [UAT.md](UAT.md) for 34 executable student/kitchen scenarios and sign-off. Automated evidence in TEST_REPORT.md is separate from physical-phone and operator acceptance.

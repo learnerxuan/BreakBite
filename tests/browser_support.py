@@ -67,3 +67,11 @@ def login(page, email, password=PASSWORD, register=False):
 
 def overflow(page):
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'Horizontal overflow'
+
+def open_basket(page):
+    if page.locator('.bb-mobile-cart').is_visible() and not page.locator('#mobile-basket-dialog').count():
+        page.locator('.bb-mobile-cart').click()
+
+def close_basket(page):
+    if page.locator('#mobile-basket-dialog').count():
+        page.locator('[data-action=close-basket]').click()

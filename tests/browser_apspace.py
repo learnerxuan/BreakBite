@@ -5,7 +5,7 @@ import argparse
 from uuid import uuid4
 
 from playwright.sync_api import expect, sync_playwright
-from browser_support import login, overflow
+from browser_support import login, overflow, open_basket, close_basket
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--base-url', default='http://127.0.0.1:8095')
@@ -20,6 +20,7 @@ with sync_playwright() as playwright:
     page.on('dialog', lambda dialog: dialog.accept())
     page.goto(args.base_url)
     login(page, f'apspace-{uuid4().hex[:8]}@example.test', register=True)
+    open_basket(page)
     page.locator('#fit-toggle').check()
     page.get_by_role('button', name='Open My planner').click()
     expect(page.get_by_role('heading', name='APSpace timetable', exact=True)).to_be_focused()
@@ -62,8 +63,10 @@ with sync_playwright() as playwright:
     page.get_by_role('button', name='My planner', exact=True).click()
     page.get_by_role('button', name='Fit a meal').click()
     expect(page.locator('#plan-form')).to_contain_text('Times from your saved timetable')
-    page.get_by_role('button', name='Add Golden chicken rice', exact=True).click()
-    page.get_by_role('button', name='Add Sparkling lemon', exact=True).click()
+    close_basket(page)
+    page.get_by_role('button', name='Add Nasi lemak ayam', exact=True).click()
+    page.get_by_role('button', name='Add Brown sugar milk tea', exact=True).click()
+    open_basket(page)
     page.get_by_label('Food budget (RM)').fill('5')
     with page.expect_request(lambda request: request.url.endswith('/api/checkout/quote')) as quoted:
         page.get_by_role('button', name='Choose pickup times', exact=True).click()
@@ -99,9 +102,11 @@ with sync_playwright() as playwright:
     expect(page.locator('.bb-order')).to_have_count(2)
     assert page.evaluate('key => sessionStorage.getItem(key)', cache_key) is None
     page.get_by_role('button', name='Explore', exact=True).click()
+    open_basket(page)
     expect(page.locator('#fit-toggle')).to_be_checked()
     expect(page.locator('#plan-start')).to_have_value('')
     expect(page.get_by_text('Your timetable changed. Choose a new break or enter your times manually.')).to_be_visible()
+    close_basket(page)
     page.get_by_role('button', name='My planner', exact=True).click()
     expect(preview).to_contain_text('Later class moved')
     expect(page.get_by_role('button', name='Fit a meal')).to_have_count(0)
