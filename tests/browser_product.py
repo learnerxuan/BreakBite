@@ -14,7 +14,7 @@ p=argparse.ArgumentParser();p.add_argument('--base-url',default='http://127.0.0.
 OUT=ROOT/'test-results'/'product';OUT.mkdir(parents=True,exist_ok=True)
 PASSWORD=os.environ.get('TEST_OPERATOR_PASSWORD','Fixture-only-password-2026')
 
-from browser_support import boot as boot_page, login, overflow
+from browser_support import boot as boot_page, login, overflow, open_basket, close_basket
 
 def boot(page):
     boot_page(page, args.base_url, args.bridge)
@@ -69,6 +69,7 @@ def timetable_fixture(name, title='TEST-CLASS'):
     return {'name': name, 'mimeType': 'text/calendar', 'buffer': '\r\n'.join(lines).encode()}, midnight.date(), next_start
 
 def test_timetable(page):
+    open_basket(page)
     fit = page.locator('#fit-toggle')
     fit.check()
     panel = page.locator('.bb-timetable')
@@ -165,6 +166,7 @@ def test_timetable(page):
         expect(page.locator('button[data-view=inbox].active')).to_be_visible()
         page.evaluate('window.finishRead["slow-inbox.ics"]()')
         page.get_by_role('button',name='Explore',exact=True).click()
+        open_basket(page)
         expect(panel).not_to_contain_text('Reading timetable')
         expect(panel).to_contain_text('initial.ics')
 
@@ -245,6 +247,7 @@ with sync_playwright() as p:
     # A valid new selection replaces the effective plan and discards the open quote.
     student.locator('[data-action=apspace-use]').dispatch_event('click')
     expect(student.locator('#checkout-dialog')).to_have_count(0)
+    open_basket(student)
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(2)
     plans = student.evaluate('window.quotePlans')
@@ -274,6 +277,12 @@ with sync_playwright() as p:
     saved_attempt = lambda: student.evaluate('key => sessionStorage.getItem(key)', cache_key)
     attempt = saved_attempt()
     assert attempt and len(student.evaluate('window.committed.orders')) == 2
+    open_basket(student)
+    expect(student.locator('#mobile-break-button')).to_be_disabled()
+    student.locator('#mobile-break-button').dispatch_event('click')
+    close_basket(student)
+    assert saved_attempt() == attempt
+    open_basket(student)
     for selector in ['#apspace-file', '[data-action=apspace-use]', '[data-action=apspace-remove]', '#plan-form button[type=submit]']:
         control = student.locator(selector)
         expect(control).to_be_disabled()
@@ -282,16 +291,19 @@ with sync_playwright() as p:
     assert saved_attempt() == attempt
 
     # The original record survives sign-out; a different student can order normally.
+    close_basket(student)
     student.get_by_role('button', name='Sign out').click()
     expect(student.locator('#fit-toggle')).not_to_be_checked()
     login(student, f'other-{uuid.uuid4().hex[:8]}@example.test', register=True)
     expect(student.locator('.bb-pending')).to_have_count(0)
     student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
+    open_basket(student)
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(1)
     assert student.evaluate('window.quotePlans.at(-1).mode') == 'pickup'
     student.locator('[data-action=close-checkout]').click()
     assert saved_attempt() == attempt
+    close_basket(student)
     student.get_by_role('button', name='Sign out').click()
     # Check the legacy unscoped key still works for an already-open tab after upgrading.
     student.evaluate('''key => {
@@ -322,13 +334,16 @@ with sync_playwright() as p:
     tofu.get_by_role('button',name='Cancel this kitchen’s order').click()
     expect(student.locator('#toast')).to_contain_text('Kitchen order cancelled')
     student.get_by_role('button',name='Explore',exact=True).click()
+    open_basket(student)
     student.locator('#fit-toggle').check()
     expect(student.locator('.bb-timetable')).not_to_contain_text('initial.ics')
     student.locator('#apspace-file').set_input_files({**fixture, 'name':'slow-session.ics'})
     wait_until(lambda: student.evaluate('Boolean(window.finishRead["slow-session.ics"])'))
+    close_basket(student)
     student.get_by_role('button',name='Sign out').click()
     login(student, f'other-{uuid.uuid4().hex[:8]}@example.test', register=True)
     student.evaluate('window.finishRead["slow-session.ics"]()')
+    open_basket(student)
     student.locator('#fit-toggle').check()
     expect(student.locator('#apspace-preview')).to_have_count(0)
     expect(student.locator('.bb-timetable')).not_to_contain_text('slow-session.ics')
@@ -338,6 +353,7 @@ with sync_playwright() as p:
         student.locator('#apspace-confirm').click()
         student.reload(wait_until='networkidle')
         expect(student.locator('#fit-toggle')).not_to_be_checked()
+        open_basket(student)
         student.locator('#fit-toggle').check()
         expect(student.locator('.bb-timetable')).not_to_contain_text('initial.ics')
         student.locator('#apspace-file').set_input_files(fixture)
@@ -354,9 +370,11 @@ with sync_playwright() as p:
         expect(student.locator('.bb-timetable')).to_have_count(0)
         student.reload(wait_until='networkidle')
     if args.apspace_export:
+        open_basket(student)
         student.locator('#fit-toggle').check()
         for export in args.apspace_export:
             verify_apspace_export(student, export)
+    close_basket(student)
     for width in [360,768,1440]:student.set_viewport_size({'width':width,'height':1000});student.get_by_role('button',name='Explore',exact=True).click();overflow(student)
     assert not errors,errors
     print(json.dumps({'result':'PASS','transport':'local rendered code/API bridge' if args.bridge else 'browser HTTP','checks':['guest catalogue','student signup','multi-kitchen checkout','two pickup codes','operator isolation','delay and consent-based replacement','payment-confirmed collection','menu creation','390/360/768/1440 layouts','APSpace file selection, keyboard review, consent, polling and gap horizon','invalid, cancelled, overlapping async and successful replacements','manual edits and removal','timetable-derived quote, lost-response checkout recovery and pickup','sign-out and actor changes during import/recovery','per-kitchen cancellation','no JS errors'],'real_apspace_exports_checked':len(args.apspace_export),'screenshots':str(OUT)},indent=2))

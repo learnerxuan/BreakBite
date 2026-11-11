@@ -118,6 +118,7 @@ with sync_playwright() as pw:
         expect(student.locator('.bb-class-row')).to_have_count(4)
         student.set_viewport_size({'width':390,'height':844});overflow(student);student.screenshot(path=str(OUT/'planner-mobile.png'),full_page=True)
         student.get_by_role('button', name='Fit a meal', exact=True).first.click();expect(student.locator('#fit-toggle')).to_be_checked()
+        student.locator('[data-action=close-basket]').click()
         student.locator('[data-action=food-details][data-id=nasi-lemak]').click();expect(student.locator('#food-dialog')).to_contain_text('soy');overflow(student)
         student.get_by_role('button',name='Close food details',exact=True).click()
         student.evaluate('window.scrollTo(0,0)');student.screenshot(path=str(OUT/'home-mobile.png'),full_page=True)

@@ -1,3 +1,10 @@
+# Mobile basket and break planning — 11 November 2026
+
+- `npm run check` passed strict TypeScript checking, **172 automated tests (0 failures)** and the production build.
+- `python tests/browser_mobile_basket.py --base-url http://127.0.0.1:8112 --chromium <Chrome executable>` passed over normal HTTP with disposable data. It reproduced the missing empty-basket shortcut before the fix, then verified direct basket/break access, draft and disclosure preservation, keyboard focus containment/return, menu scroll preservation, quantity edits, empty state, one modal during checkout/sign-in and responsive sidebar/sheet transitions at 360/390/768/1440px.
+- All six existing browser suites passed on disposable local servers: `browser_product.py`, `browser_v3.py`, `browser_apspace.py`, `browser_campus.py`, `browser_savings.py` and `browser_notifications.py`. Coverage includes timetable file imports, saved timetable gaps, stale break warnings, lost-response recovery without changing the stored request, QR handover and independent kitchen cancellation. An existing stale-break assertion initially tried to read the closed sheet; opening the sheet before checking the warning fixed the browser journey.
+- Mobile screenshots were visually checked. The fixed bar is available even with no items; the sheet keeps its close and checkout controls visible and respects the bottom safe area. Physical phone, virtual keyboard and Safari behavior remain unverified.
+
 # Estimated time saved and kitchen retirement — 11 November 2026
 
 - `npm run check` passed strict TypeScript checking, **172 automated tests (0 failures)** and the production build. Windows used `$env:npm_config_script_shell = (Get-Command pwsh).Source` for nested npm calls.

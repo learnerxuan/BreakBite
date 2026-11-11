@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from uuid import uuid4
 from playwright.sync_api import expect, sync_playwright
-from browser_support import ROOT, login, overflow
+from browser_support import ROOT, login, overflow, open_basket
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--base-url', default='http://127.0.0.1:8080')
@@ -37,6 +37,7 @@ with sync_playwright() as p:
     student.get_by_role('button', name='Add Nasi lemak ayam', exact=True).click()
     student.get_by_role('button', name='Add Brown sugar milk tea', exact=True).click()
     expect(student.locator('.bb-prep-preview')).to_contain_text('~8 min')
+    open_basket(student)
     student.get_by_role('button', name='Choose pickup times', exact=True).click()
     student.get_by_role('button', name='Confirm all kitchen orders', exact=True).click()
     expect(student.locator('.bb-order')).to_have_count(2)

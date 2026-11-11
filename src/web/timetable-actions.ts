@@ -131,6 +131,7 @@ export function timetableActions(s: ViewState, render: () => void, invalidate: (
             s.manualPlan = false;
             s.fitBreak = true;
             s.view = 'explore';
+            s.mobileBasketOpen = true;
             s.timetable.applied = gap;
             s.timetable.appliedSaved = true;
             invalidate();

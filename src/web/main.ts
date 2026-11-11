@@ -8,7 +8,7 @@ import { api, ApiError, restore, signIn, signOut } from './client.js';
 import { defaultBreakPlan, initialState } from './state.js';
 import { esc } from './ui.js';
 import { timetableActions } from './timetable-actions.js';
-import { explore, orders, checkoutDialog } from './views/student.js';
+import { explore, orders, checkoutDialog, mobileBasket } from './views/student.js';
 import { vendor, menuDialog } from './views/vendor.js';
 const root=document.querySelector<HTMLDivElement>('#app')!;
 const s=initialState();
@@ -20,6 +20,20 @@ const checkoutCacheFor = (actorId: string) => `${checkoutCache}:${actorId}`;
 type CheckoutAttempt = { key: string; serialized: string; actorId: string; storageKey: string };
 let attempt: CheckoutAttempt | null = null;
 let actorGeneration = 0;
+let basketReturnFocus = 'mobile-basket-button';
+let basketScrollTop = 0;
+let basketDetailsOpen = false;
+
+function closeBasket(): void {
+    s.mobileBasketOpen = false;
+    render();
+    document.getElementById(basketReturnFocus)?.focus({ preventScroll: true });
+}
+function returnToBasket(): void {
+    s.quote = null; s.checkoutError = '';
+    s.mobileBasketOpen = mobileBasket();
+    render();
+}
 
 function restoreAttempt(actor: Actor | null): CheckoutAttempt | null {
     if (actor?.role !== 'student') return null;
@@ -52,6 +66,7 @@ const timetable = timetableActions(s, render, invalidate, notify);
 function navigate(view: typeof s.view): void {
     if (view !== 'explore' && s.timetable.loading) timetable.cancelPreview();
     s.view = view;
+    if (view !== 'explore') s.mobileBasketOpen = false;
 }
 function setActor(actor: Actor | null): void {
     if (s.actor?.id !== actor?.id || s.actor?.role !== actor?.role) {
@@ -63,6 +78,7 @@ function setActor(actor: Actor | null): void {
         delete s.apspaceFeedback;
         delete s.apspaceReview;
         s.fitBreak = false; s.plan = defaultBreakPlan(); s.planDraft = {}; s.manualPlan = false;
+        s.mobileBasketOpen = false; basketScrollTop = 0; basketDetailsOpen = false;
         s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
         s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
         s.savings = { minutes: 0, checkouts: 0 };
@@ -122,7 +138,11 @@ function authDialog(): string {
 function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
-    const planDetailsOpen = root.querySelector<HTMLDetailsElement>('#plan-form details')?.open;
+    const detailsBefore = root.querySelector<HTMLDetailsElement>('#plan-form details');
+    if (detailsBefore) basketDetailsOpen = detailsBefore.open;
+    const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
+    if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
+    if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
     const student=s.actor?.role!=='vendor';
     root.innerHTML=`<header class="bb-header"><a href="/" class="bb-brand" aria-label="BreakBite home"><span>b</span>BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}">Explore</button><button data-view="availability" class="${s.view==='availability'?'active':''}">Availability</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}">My orders</button><button data-view="saved" class="${s.view==='saved'?'active':''}">Saved</button><button data-view="planner" class="${s.view==='planner'?'active':''}">My planner</button><button data-view="inbox" class="${s.view==='inbox'?'active':''}">Inbox${s.notices.filter(n=>!n.readAt).length?` (${s.notices.filter(n=>!n.readAt).length})`:''}</button>`:''}`:'<span class="bb-kicker">KITCHEN WORKSPACE</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
     ${s.offline?'<div class="bb-offline" role="status">Connection interrupted. Retrying… Your confirmed orders are saved. Do not submit a new checkout for an uncertain request.</div>':''}
@@ -132,14 +152,17 @@ function render(): void {
     const selected = nav?.querySelector<HTMLElement>('button.active');
     if(nav && selected){const n=nav.getBoundingClientRect(),b=selected.getBoundingClientRect();if(b.left<n.left)nav.scrollLeft-=n.left-b.left;else if(b.right>n.right)nav.scrollLeft+=b.right-n.right;}
     for(const dialog of root.querySelectorAll<HTMLDialogElement>('dialog')) {
-        dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
+        dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){if(dialog.id==='mobile-basket-dialog'){closeBasket();return;}if(dialog.id==='checkout-dialog'){returnToBasket();return;}stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
     }
     root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>{if(s.busy)b.disabled=true;});
-    if (planDetailsOpen) {
+    if (basketDetailsOpen) {
         const details = root.querySelector<HTMLDetailsElement>('#plan-form details');
         if (details) details.open = true;
     }
-    if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
+    const modal = root.querySelector('dialog[open]');
+    if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el && (!modal || modal.contains(el))){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
+    const scrollAfter = root.querySelector<HTMLElement>('.bb-basket-scroll');
+    if (scrollAfter && s.mobileBasketOpen) scrollAfter.scrollTop = basketScrollTop;
 }
 async function work(fn: ()=>Promise<void>): Promise<void> {
     if(s.busy)return;s.busy=true;
@@ -247,10 +270,21 @@ root.addEventListener('click',event=>{
     if(action==='login'){s.auth='login';s.authError='';render();return;}
     if(action==='switch-auth'){s.auth=s.auth==='login'?'register':'login';s.authError='';render();return;}
     if(action==='close-auth'){s.auth=null;s.authError='';render();return;}
-    if(action==='close-checkout'){s.quote=null;s.checkoutError='';render();return;}
+    if(action==='close-checkout'){returnToBasket();return;}
     if(action==='close-editor'){s.editing=null;render();return;}
     if(action==='clear-allergen-filters'){s.allergenFilters=[];render();return;}
-    if(action==='show-basket'){document.getElementById('basket')?.scrollIntoView({behavior:'smooth'});document.getElementById('basket')?.focus({preventScroll:true});return;}
+    if(action==='close-basket'){closeBasket();return;}
+    if(action==='show-basket'||action==='open-break-plan'){
+        if(action==='open-break-plan'){
+            if(s.uncertain)return;
+            if(!s.fitBreak){s.fitBreak=true;invalidate();}
+        }
+        if(mobileBasket()){
+            basketReturnFocus=target.id || 'mobile-basket-button';s.mobileBasketOpen=true;render();
+            if(action==='open-break-plan') document.getElementById('fit-toggle')?.scrollIntoView({block:'start'});
+        }else{render();document.getElementById('basket')?.scrollIntoView({behavior:'smooth'});document.getElementById('basket')?.focus({preventScroll:true});}
+        return;
+    }
     if(action==='new-item'){s.editing='new';render();return;}
     if(action==='edit-item'){s.editing=s.items.find(i=>i.id===id&&i.vendorId===vid)??null;render();return;}
     if(action==='add'||action==='plus'||action==='minus'){
@@ -371,4 +405,5 @@ async function boot(): Promise<void> {
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
     if(event.data?.type==='OPEN_INBOX'){if(s.actor?.role==='vendor')return;navigate(s.actor?'inbox':'explore');if(!s.actor)s.auth='login';void refreshPush(s.actor).then(()=>render());render();}
 });
+matchMedia('(max-width: 860px)').addEventListener('change', () => { if (!s.busy) render(); });
 void boot();

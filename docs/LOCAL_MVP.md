@@ -26,6 +26,7 @@ The added project-purpose menus contain sample ingredients, spice levels, warnin
 
 ## Main flow
 
+- On phones/tablets, the fixed **Your basket** and **Fit my break** shortcuts open a bottom sheet, including when the basket is empty. Close it to continue browsing; basket contents and time drafts are preserved. Desktop keeps the basket sidebar.
 - Add food from one kitchen and a drink from another to the same basket.
 - Choose a pickup window for each kitchen. The default suggestion staggers windows.
 - Set a realistic walking time between counters. One minute per handover is also reserved in the itinerary check.
