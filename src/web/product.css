@@ -25,3 +25,63 @@ body{margin:0;background:var(--bb-paper);color:var(--bb-ink);font-family:Inter,u
 
 /* Dedicated availability and push preferences: preserve usable controls on narrow screens. */
 .bb-push-panel{margin-bottom:1.5rem;max-width:900px}.bb-push-panel h2{margin-top:.3rem}.bb-push-panel p{overflow-wrap:anywhere}.bb-push-panel details{margin-top:1rem}.bb-push-panel .bb-actions{flex-wrap:wrap;gap:.75rem}.bb-push-panel button:disabled{opacity:.55;cursor:not-allowed}.bb-header nav{overflow-x:auto;scrollbar-width:thin}.bb-header nav button{flex-shrink:0}.bb-load-card{min-width:0}.bb-load-timeline{overflow-x:auto}
+
+.bb-basket:has(.bb-timetable) { position: static; }
+.bb-timetable {
+    display: grid;
+    gap: 10px;
+    margin-block: 16px;
+    padding: 14px;
+    border: 1px solid var(--bb-line);
+    border-radius: 12px;
+    overflow-wrap: anywhere;
+}
+.bb-timetable h3, .bb-timetable h4, .bb-timetable h5, .bb-timetable p { margin: 0; }
+.bb-timetable :is(h3, h4) { font-size: 14px; }
+.bb-timetable h5 { font-size: 12px; }
+.bb-timetable label { margin-block: 4px; }
+.bb-timetable input { min-width: 0; max-width: 100%; }
+.bb-timetable :is(input, button, [tabindex]), #plan-start { scroll-margin-block: 116px 76px; }
+.bb-timetable :is(.bb-timetable-preview, .bb-timetable-approved, .bb-timetable-classes) { display: grid; gap: 8px; }
+.bb-timetable-class > span, .bb-timetable-gap > div { display: grid; gap: 3px; min-width: 0; }
+.bb-timetable-class { padding-block: 6px; border-bottom: 1px solid var(--bb-line); }
+.bb-timetable-gap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.bb-timetable .bb-text-button { justify-self: start; }
+@media (max-width: 480px) {
+    .bb-timetable-gap { align-items: stretch; flex-direction: column; }
+}
+
+.bb-apspace {
+    --apspace-action: #a33d24;
+    --apspace-focus: #245a47;
+    --apspace-border: #707b73;
+    --apspace-secondary: #4f5e53;
+    color: var(--bb-ink);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+.bb-apspace :is(.bb-small, .bb-timetable-gap, .bb-warning, .bb-error, label, summary) {
+    font-size: .9375rem;
+}
+.bb-apspace .bb-small, .bb-apspace #apspace-intake-help { color: var(--apspace-secondary); }
+.bb-apspace h3 { font-size: 1.125rem; }
+.bb-apspace-form { display: grid; gap: .75rem; }
+.bb-apspace-form .bb-button { justify-self: start; }
+.bb-apspace .bb-button, .bb-apspace .bb-text-button { font-size: .9375rem; }
+.bb-apspace input[type=checkbox] { accent-color: var(--apspace-action); }
+.bb-apspace .bb-button.primary { background: var(--apspace-action); }
+.bb-apspace .bb-button.primary:hover { background: #88321e; }
+.bb-apspace .bb-text-button { color: var(--apspace-action); }
+.bb-apspace :is(input:not([type=checkbox]), select) { border-color: var(--apspace-border); font-size: 1rem; }
+.bb-apspace input[aria-invalid=true] { border-color: var(--apspace-action); }
+.bb-apspace :is(button, input, select, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--apspace-focus);
+    outline-offset: 3px;
+}
+.bb-apspace label.bb-check { min-height: 44px; padding: .625rem .25rem; cursor: pointer; }
+.bb-apspace-consent { border-block-start: 1px solid var(--bb-line); }
+.bb-apspace summary { display: list-item; min-height: 44px; padding-block: .625rem; cursor: pointer; }
+.bb-apspace .bb-timetable-gap strong { font-size: 1.125rem; font-variant-numeric: tabular-nums; }
+@media (forced-colors: active) {
+    .bb-apspace :is(button, input, select, summary, [tabindex]):focus-visible { outline-color: Highlight; }
+}

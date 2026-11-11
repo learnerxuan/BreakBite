@@ -1,3 +1,28 @@
+# Automatic APSpace import verification — 9 November 2026
+
+- `npm run check` passed strict type checking, all 156 automated tests and the production build. APSpace tests cover source validation, shared caching and retry backoff, session ownership and consent, update review, missing dates, disconnect races and saved gap rendering.
+- `python tests/browser_apspace.py --base-url http://127.0.0.1:8101 --chromium <Edge executable>` passed over normal local HTTP using `node tests/setup-apspace-browser.mjs` and a disposable database. It covers manual intake-code entry, group selection, keyboard consent, persistence after reload, visible checkout preferences, atomic two-kitchen checkout recovery across a refresh, obsolete break removal, change review and disconnect. Layouts were checked at 360, 390, 768 and 1440 pixels.
+- `python tests/browser_product.py` and `python tests/browser_v3.py` passed on disposable servers over normal HTTP in Edge. The former also verified one real APSpace file in the fallback UI. The latter verified manual classes, the saved file import and independent QR decoding.
+- A local API run with `BREAKBITE_APSPACE=true` used the public upstream through options, preview, confirmation, profile and disconnect. A separate comparison matched all 32 start/end pairs in two intake exports for the week of 16 November. The upstream returned HTTP 304 on ETag revalidation.
+- Browser change and retry tests use a synthetic provider. Upstream publication cadence, multi-group parity across weeks, shared deployment terms, physical phone use and public deployment remain unverified. The real provider is off by default.
+
+# APSpace Fit my break verification — 9 November 2026
+
+| Check | Result |
+| --- | --- |
+| `git pull --ff-only`, then `git switch -c codex/apspace-timetable` | Based on `982d766`. Baseline `npm run check` passed with 128 tests. |
+| `npm run check` | Strict TypeScript, 138 tests with zero failures, and production build passed. The Windows sandbox denied temporary database renames on one run. The full check passed with normal filesystem access. |
+| `npm exec tsc -- -p tsconfig.test.json` and `node --test dist-tests/tests/timetable.test.js` | Six parser and gap tests passed. Repeated with `TZ=America/Los_Angeles` with the same results. |
+| `python tests/browser_product.py --base-url http://127.0.0.1:8081 --chromium <Edge executable> --apspace-export <file> --apspace-export <file>` | Passed in Edge 156 over normal localhost HTTP using an isolated JSON fixture. The run used the browser's cookie session, app CSP and file picker. |
+| `python tests/browser_v3.py --base-url http://127.0.0.1:8082 --chromium <Edge executable>` | Passed over normal localhost HTTP with a separate fixture, including the saved calendar flow and independent QR decoding. |
+
+- **A1–A2.** Compared two APSpace intake exports for the selected week of 16 November. Each contained 16 entries dated 16–20 November MYT, including two overlapping entries. Both used UTC timestamps and folded lines. Edge preview dates and times matched an independent conversion from each local file. Invalid UTF-8, cancelled previews and late file reads preserved the accepted timetable. Opening Inbox through a notification cancelled a pending read.
+- **A3–A5.** Verified inclusion, explicit consent, focus across polling, future-gap restrictions, invalidation after a new selection, manual edits, removal and ordinary order-ahead.
+- **A6–A7.** Verified an imported two-kitchen quote and checkout, sold-out rollback, concurrent retries, one-time payment-confirmed pickup and independent cancellation. A different account could quote an ordinary order while the original recovery payload stayed intact. The original student recovered the same child orders using the legacy cache format. Timetables cleared on refresh, sign-out and a simulated session expiry. Quote payloads used the existing plan fields.
+- **A8.** Verified normal browser file selection, keyboard activation and focus, and horizontal overflow at 360, 390, 768 and 1440px. Browser tests used synthetic accounts and near-current synthetic class times for ordering. Physical phones and deployed HTTPS remain untested for this change.
+
+---
+
 # v0.3.1 verification — 8 November 2026
 
 - Strict typecheck, **128 automated tests (0 failures)**, production build: passed in this environment.

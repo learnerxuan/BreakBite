@@ -2,10 +2,11 @@ import { pushAction, refreshPush, pushFingerprint, detachPush } from './push-cli
 import { foodCheck, emptyProfile, type StudentProfile, type Notice, type BookingLoad } from '../shared/features.js';
 import { productActions, stopCamera } from './product-actions.js';
 import { personalView, productDialogs, availabilityView } from './views/personal.js';
-import type { AppConfig, BasketGroup, BasketQuote, CheckoutResult, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
+import type { Actor, AppConfig, BasketGroup, BasketQuote, CheckoutResult, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
 import { api, ApiError, restore, signIn, signOut } from './client.js';
-import { initialState } from './state.js';
-import { esc, fromLocal } from './ui.js';
+import { defaultBreakPlan, initialState } from './state.js';
+import { esc } from './ui.js';
+import { timetableActions } from './timetable-actions.js';
 import { explore, orders, checkoutDialog } from './views/student.js';
 import { vendor, menuDialog } from './views/vendor.js';
 const root=document.querySelector<HTMLDivElement>('#app')!;
@@ -13,8 +14,30 @@ const s=initialState();
 let noticeIds = new Set<string>();
 let noticesInitialised = false;
 let timer: ReturnType<typeof setTimeout>; let refreshing=false;
-let attempt: { key: string; serialized: string; actorId: string } | null=null;
-try { attempt=JSON.parse(sessionStorage.getItem('breakbite-checkout-v2')??'null'); } catch { /* New checkout. */ }
+const checkoutCache = 'breakbite-checkout-v2';
+const checkoutCacheFor = (actorId: string) => `${checkoutCache}:${actorId}`;
+type CheckoutAttempt = { key: string; serialized: string; actorId: string; storageKey: string };
+let attempt: CheckoutAttempt | null = null;
+let actorGeneration = 0;
+
+function restoreAttempt(actor: Actor | null): CheckoutAttempt | null {
+    if (actor?.role !== 'student') return null;
+    for (const storageKey of [checkoutCacheFor(actor.id), checkoutCache]) {
+        try {
+            const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? 'null');
+            if (saved?.actorId === actor.id && typeof saved.key === 'string' && typeof saved.serialized === 'string') {
+                return { key: saved.key, serialized: saved.serialized, actorId: actor.id, storageKey };
+            }
+        } catch { /* Check the other cache key if the entry is unreadable. */ }
+    }
+    return null;
+}
+
+function clearAttempt(): void {
+    if (attempt) sessionStorage.removeItem(attempt.storageKey);
+    attempt = null;
+    s.uncertain = false;
+}
 function notify(message: string, error=false): void {
     const el=document.querySelector<HTMLDivElement>('#toast')!;
     el.textContent=message;el.className=`show ${error?'error':''}`;clearTimeout(timer);timer=setTimeout(()=>el.className='',6000);
@@ -23,18 +46,59 @@ const requestId=():string => Array.from(crypto.getRandomValues(new Uint8Array(16
 const groupCart=(): BasketGroup[] => [...new Set(s.cart.map(c=>c.vendorId))].sort().map(vendorId=>({vendorId,items:s.cart.filter(c=>c.vendorId===vendorId).map(({itemId,quantity})=>({itemId,quantity})).sort((a,b)=>a.itemId.localeCompare(b.itemId))}));
 const plan=()=>s.fitBreak?s.plan:{mode:'pickup',budgetSen:50000};
 const vendorPath=(part: string,id=s.actor?.vendorId??'')=>`/api/vendors/${encodeURIComponent(id)}/${part}`;
-function invalidate(): void { s.quote=null;s.chosen={};s.checkoutError='';s.uncertain=false;attempt=null;sessionStorage.removeItem('breakbite-checkout-v2');sessionStorage.setItem('breakbite-cart-v2',JSON.stringify(s.cart)); }
-async function refresh(): Promise<void> {
-    if(s.actor){s.snapshot=await api<Snapshot>('/api/state');s.actor=s.snapshot.actor;s.vendors=s.snapshot.vendors;s.items=s.snapshot.items;
-        s.loads=await api<BookingLoad[]>('/api/product/loads');
-        if(s.actor.role==='student') {
-            const p=await api<{profile:StudentProfile;notices:Notice[]}>('/api/product/profile');
-            const fresh=p.notices.filter(n=>!n.readAt&&!noticeIds.has(n.id));
-            if(noticesInitialised && fresh.length) notify(fresh[0]!.message); // OS alerts come only from the push worker, avoiding duplicates.
-            noticesInitialised=true;noticeIds=new Set(p.notices.map(n=>n.id));s.profile=p.profile;s.notices=p.notices;
-        } else {s.profile=emptyProfile();s.notices=[];}
+function invalidate(): void { s.quote=null;s.chosen={};s.checkoutError='';clearAttempt();sessionStorage.setItem('breakbite-cart-v2',JSON.stringify(s.cart)); }
+const timetable = timetableActions(s, render, invalidate, notify);
+function navigate(view: typeof s.view): void {
+    if (view !== 'explore' && s.timetable.loading) timetable.cancelPreview();
+    s.view = view;
+}
+function setActor(actor: Actor | null): void {
+    if (s.actor?.id !== actor?.id || s.actor?.role !== actor?.role) {
+        actorGeneration++;
+        attempt = restoreAttempt(actor);
+        s.uncertain = Boolean(attempt);
+        timetable.reset();
+        delete s.apspaceSetup;
+        delete s.apspaceFeedback;
+        delete s.apspaceReview;
+        s.fitBreak = false; s.plan = defaultBreakPlan(); s.planDraft = {}; s.manualPlan = false;
+        s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
+        s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
     }
-    else {const c=await api<{vendors:Vendor[];items:MenuItem[];loads:BookingLoad[]}>('/api/catalog');s.vendors=c.vendors;s.items=c.items;s.loads=c.loads;s.snapshot=null;s.profile=emptyProfile();s.notices=[];noticeIds.clear();noticesInitialised=false;}
+    s.actor = actor;
+}
+async function refresh(): Promise<void> {
+    let generation = actorGeneration;
+    if(s.actor){
+        try {
+            const snapshot = await api<Snapshot>('/api/state');
+            if (generation !== actorGeneration) return;
+            setActor(snapshot.actor);
+            generation = actorGeneration;
+            const time = Date.parse(snapshot.serverTime);
+            s.serverClock = Number.isFinite(time) ? { time, sampledAt: performance.now() } : null;
+            const loads = await api<BookingLoad[]>('/api/product/loads');
+            if (generation !== actorGeneration) return;
+            if (snapshot.actor.role === 'student') {
+                const p = await api<{profile:StudentProfile;notices:Notice[]}>('/api/product/profile');
+                if (generation !== actorGeneration) return;
+                const fresh = p.notices.filter(n => !n.readAt && !noticeIds.has(n.id));
+                if (noticesInitialised && fresh.length) notify(fresh[0]!.message);
+                noticesInitialised = true;
+                noticeIds = new Set(p.notices.map(n => n.id)); s.profile = p.profile; s.notices = p.notices;
+                timetable.clearStaleSavedBreak();
+            }
+            s.snapshot = snapshot; s.vendors = snapshot.vendors; s.items = snapshot.items; s.loads = loads;
+        } catch (error) {
+            if (generation !== actorGeneration) return;
+            if (error instanceof ApiError && [401, 403].includes(error.status)) {
+                setActor(null);
+                s.view = 'explore'; s.auth = 'login'; s.authError = 'Your session expired. Please sign in again.';
+            }
+            throw error;
+        }
+    }
+    else {const c=await api<{vendors:Vendor[];items:MenuItem[];loads:BookingLoad[]}>('/api/catalog');if(generation!==actorGeneration)return;s.vendors=c.vendors;s.items=c.items;s.loads=c.loads;}
     if(s.view==='inbox') await refreshPush(s.actor);
     s.offline=false;
 }
@@ -46,6 +110,7 @@ function authDialog(): string {
 function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
+    const planDetailsOpen = root.querySelector<HTMLDetailsElement>('#plan-form details')?.open;
     const student=s.actor?.role!=='vendor';
     root.innerHTML=`<header class="bb-header"><a href="/" class="bb-brand" aria-label="BreakBite home"><span>b</span>BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}">Explore</button><button data-view="availability" class="${s.view==='availability'?'active':''}">Availability</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}">My orders</button><button data-view="saved" class="${s.view==='saved'?'active':''}">Saved</button><button data-view="planner" class="${s.view==='planner'?'active':''}">My planner</button><button data-view="inbox" class="${s.view==='inbox'?'active':''}">Inbox${s.notices.filter(n=>!n.readAt).length?` (${s.notices.filter(n=>!n.readAt).length})`:''}</button>`:''}`:'<span class="bb-kicker">KITCHEN WORKSPACE</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
     ${s.offline?'<div class="bb-offline" role="status">Connection interrupted. Retrying… Your confirmed orders are saved. Do not submit a new checkout for an uncertain request.</div>':''}
@@ -58,16 +123,21 @@ function render(): void {
         dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
     }
     root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>{if(s.busy)b.disabled=true;});
+    if (planDetailsOpen) {
+        const details = root.querySelector<HTMLDetailsElement>('#plan-form details');
+        if (details) details.open = true;
+    }
     if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
 }
 async function work(fn: ()=>Promise<void>): Promise<void> {
     if(s.busy)return;s.busy=true;
+    if (s.timetable.loading) timetable.cancelPreview();
     // Avoid replacing an active form and losing typed credentials while a request is running.
     root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>b.disabled=true);
     try{await fn();}
     catch(e){
         const message=e instanceof Error?e.message:'Request failed. Please retry.';
-        if(e instanceof ApiError&&e.status===401){s.actor=null;s.snapshot=null;s.auth='login';s.authError=message;}
+        if(e instanceof ApiError&&e.status===401){setActor(null);s.view='explore';s.auth='login';s.authError=message;}
         else if(s.auth)s.authError=message;
         else if(s.quote)s.checkoutError=message;
         notify(message,true);
@@ -78,17 +148,31 @@ function confirmed(result: CheckoutResult): void {
 }
 async function sendAttempt(): Promise<void> {
     if(!attempt||attempt.actorId!==s.actor?.id)throw new Error('Sign in with the account used for this checkout.');
+    const original = attempt;
+    const generation = actorGeneration;
     try {
-        const existing=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(attempt.key)}`);
-        const result=existing.checkout??await api<CheckoutResult>('/api/checkouts','POST',JSON.parse(attempt.serialized),{'Idempotency-Key':attempt.key});
+        const existing=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(original.key)}`);
+        if (generation !== actorGeneration) throw new Error('Sign in with the account used for this checkout.');
+        const result=existing.checkout??await api<CheckoutResult>('/api/checkouts','POST',JSON.parse(original.serialized),{'Idempotency-Key':original.key});
+        if (generation !== actorGeneration) throw new Error('Sign in with the account used for this checkout.');
         confirmed(result);await refresh();window.scrollTo({top:0});
     } catch(e) {
-        if(attempt) {
-            if(e instanceof ApiError&&[400,403,404,409,422].includes(e.status)) { attempt=null;s.uncertain=false;sessionStorage.removeItem('breakbite-checkout-v2'); }
+        if(attempt === original) {
+            if(generation === actorGeneration && e instanceof ApiError&&[400,404,409,422].includes(e.status)) clearAttempt();
             else {s.uncertain=true;s.quote=null;}
         }
         throw e;
     }
+}
+async function checkSavedBreak(generation: number): Promise<boolean> {
+    if (s.fitBreak && s.timetable.appliedSaved) {
+        const { profile } = await api<{ profile: StudentProfile }>('/api/product/profile');
+        if (generation !== actorGeneration) return false;
+        s.profile = profile;
+        if (timetable.clearStaleSavedBreak()) throw new Error(s.checkoutError);
+    }
+    timetable.validateBreak();
+    return true;
 }
 async function review(): Promise<void> {
     if(s.uncertain){await sendAttempt();return;}
@@ -96,7 +180,21 @@ async function review(): Promise<void> {
     if(!s.actor){s.auth='login';s.authError='';return;}
     if(s.actor.role!=='student')throw new Error('Use a student account to order.');
     s.checkoutError='';
-    const q=await api<BasketQuote>('/api/checkout/quote','POST',{groups:groupCart(),plan:plan()});
+    const generation = actorGeneration;
+    let q: BasketQuote;
+    try {
+        if (!await checkSavedBreak(generation)) return;
+        const requestedPlan = plan();
+        q = await api<BasketQuote>('/api/checkout/quote','POST',{groups:groupCart(),plan:requestedPlan});
+        if (generation === actorGeneration) {
+            if (s.fitBreak && requestedPlan !== s.plan) throw new Error(s.checkoutError || 'Your break changed. Check pickup times again.');
+            timetable.validateBreak();
+        }
+    } catch (error) {
+        if (generation === actorGeneration && error instanceof Error) s.checkoutError = error.message;
+        throw error;
+    }
+    if (generation !== actorGeneration) return;
     s.quote=q;s.chosen={};
     // Default to a staggered route; the server independently validates the final selection.
     let end=0;
@@ -105,10 +203,28 @@ async function review(): Promise<void> {
 const extra=productActions(s,{work,render,refresh,invalidate,notify});
 root.addEventListener('click',event=>{
     const target=(event.target as Element).closest<HTMLElement>('button');if(!target||s.busy)return;
-    if(extra.click(target))return;
     const action=target.dataset.action;
+    if(action==='saved-break'){
+        if (s.uncertain) return;
+        const quoteBasket = Boolean(target.closest('#basket') && s.cart.length);
+        try {
+            timetable.useSavedBreak(target.dataset.end);
+            if (quoteBasket) void work(review);
+        }
+        catch (error) { notify((error as Error).message,true); }
+        return;
+    }
+    if(extra.click(target))return;
+    if(timetable.click(target))return;
     if(action?.startsWith('push-')){void work(async()=>{notify(await pushAction(action,target.dataset.id,s.actor));});return;}const id=target.dataset.id??'';const vid=target.dataset.vendor??s.actor?.vendorId??'';
-    if(target.dataset.view){s.view=target.dataset.view as typeof s.view;if(['orders','saved','planner','inbox'].includes(s.view)&&!s.actor)s.auth='login';render();if(s.view==='inbox')void refreshPush(s.actor).then(()=>render());return;}
+    if(target.dataset.view){
+        navigate(target.dataset.view as typeof s.view);
+        if(['orders','saved','planner','inbox'].includes(s.view)&&!s.actor)s.auth='login';
+        render();
+        if(target.id==='apspace-open-planner')document.getElementById('apspace-connect-heading')?.focus();
+        if(s.view==='inbox')void refreshPush(s.actor).then(()=>render());
+        return;
+    }
     if(target.dataset.vendorTab){s.vendorTab=target.dataset.vendorTab as typeof s.vendorTab;render();return;}
     if(target.dataset.category){s.category=target.dataset.category;render();return;}
     if(action==='login'){s.auth='login';s.authError='';render();return;}
@@ -131,8 +247,17 @@ root.addEventListener('click',event=>{
         invalidate();render();if(action==='add')notify('Added to your basket. You can add items from other kitchens too.');return;
     }
     if(!action)return;
+    if(action==='review' && s.actor?.role==='student' && s.fitBreak && !s.uncertain && Object.keys(s.planDraft).length){
+        const form = document.querySelector<HTMLFormElement>('#plan-form')!;
+        try { timetable.applyForm(form); }
+        catch (error) { notify((error as Error).message, true); return; }
+    }
     void work(async()=>{
-        if(action==='logout'){await signOut();await detachPush().catch(()=>undefined);s.actor=null;s.view='explore';s.cart=[];s.recovery={};s.success='';invalidate();await refresh();}
+        if(action==='logout'){
+            await signOut();setActor(null);s.view='explore';s.cart=[];s.recovery={};s.success='';
+            sessionStorage.removeItem('breakbite-cart-v2');
+            await detachPush().catch(()=>undefined);await refresh();
+        }
         else if(action==='review')await review();
         else if(action==='retry-checkout')await sendAttempt();
         else if(action==='cancel'){
@@ -151,27 +276,46 @@ root.addEventListener('click',event=>{
 });
 root.addEventListener('change',event=>{
     const el=event.target as HTMLInputElement|HTMLSelectElement;
-    if(s.uncertain){notify('Confirm the original checkout before changing preferences.',true);render();return;}
-    if(el.id==='fit-toggle'){s.fitBreak=(el as HTMLInputElement).checked;invalidate();render();}
+    if(s.busy||timetable.change(el))return;
+    if(s.uncertain && (el.id==='fit-toggle'||el.dataset.slotVendor||el.name==='transferMinutes')){
+        notify('Confirm the original checkout before changing preferences.',true);render();return;
+    }
+    if(el.id==='fit-toggle'){s.fitBreak=(el as HTMLInputElement).checked;if(!s.fitBreak)timetable.cancelPreview();invalidate();render();}
     else if(el.id==='kitchen-filter'){s.vendorFilter=el.value;render();}
     else if(el.dataset.slotVendor)s.chosen[el.dataset.slotVendor]=el.value;
     else if(el.name==='transferMinutes')s.transferMinutes=Number(el.value);
 });
+root.addEventListener('input', event => {
+    const input = event.target as HTMLInputElement;
+    if(extra.input(input))return;
+    if (!s.busy && !s.uncertain && input.form?.id === 'plan-form') s.planDraft[input.name] = input.value;
+});
 root.addEventListener('submit',event=>{
     event.preventDefault();const form=event.target as HTMLFormElement;const f=new FormData(form);if(extra.submit(form))return;
     if(form.id==='search-form'){s.search=String(f.get('search')??'');render();return;}
+    if(form.id==='plan-form'){
+        if(s.busy||s.uncertain)return;
+        try { timetable.applyForm(form); render(); notify('Time preferences applied.'); }
+        catch (error) { notify((error as Error).message, true); }
+        return;
+    }
     void work(async()=>{
         if(form.id==='auth-form'){
-            s.actor=await signIn({email:f.get('email'),password:f.get('password'),...(s.auth==='register'?{name:f.get('name')}:{})},s.auth==='register');s.auth=null;s.authError='';s.view=s.actor.role==='vendor'?'vendor':new URLSearchParams(location.search).get('view')==='inbox'?'inbox':'explore';await refresh();await refreshPush(s.actor);
+            const actor=await signIn({email:f.get('email'),password:f.get('password'),...(s.auth==='register'?{name:f.get('name')}:{})},s.auth==='register');setActor(actor);s.auth=null;s.authError='';s.view=actor.role==='vendor'?'vendor':new URLSearchParams(location.search).get('view')==='inbox'?'inbox':'explore';await refresh();await refreshPush(s.actor);
             notify('Signed in.');
-        }else if(form.id==='plan-form'){
-            if(s.uncertain)throw new Error('Confirm the original checkout before changing preferences.');
-            s.plan={breakStartAt:fromLocal(f.get('breakStartAt')),nextClassAt:fromLocal(f.get('nextClassAt')),walkToMinutes:Number(f.get('walkToMinutes')),returnMinutes:Number(f.get('returnMinutes')),eatMinutes:Number(f.get('eatMinutes')),bufferMinutes:Number(f.get('bufferMinutes')),budgetSen:Math.round(Number(f.get('budget'))*100)};invalidate();notify('Time preferences applied.');
         }else if(form.id==='checkout-form'){
+            if(s.uncertain){await sendAttempt();return;}
+            if (!await checkSavedBreak(actorGeneration)) return;
             if(!s.quote)throw new Error('Review your basket first.');
             const payload={groups:groupCart().map(g=>({...g,slotId:String(f.get(`slot:${g.vendorId}`)??'')})),plan:plan(),transferMinutes:s.transferMinutes,expectedTotalSen:s.quote.totalSen,menuVersions:s.quote.menuVersions};
             const serialized=JSON.stringify(payload);
-            if(!attempt||attempt.serialized!==serialized){attempt={key:requestId(),serialized,actorId:s.actor!.id};sessionStorage.setItem('breakbite-checkout-v2',JSON.stringify(attempt));}
+            if(!attempt||attempt.serialized!==serialized){
+                const actorId = s.actor!.id;
+                const stored = { key: requestId(), serialized, actorId };
+                const storageKey = checkoutCacheFor(actorId);
+                sessionStorage.setItem(storageKey, JSON.stringify(stored));
+                attempt = { ...stored, storageKey };
+            }
             await sendAttempt();
         }else if(form.dataset.collect){await api(vendorPath(`orders/${encodeURIComponent(form.dataset.collect)}/collect`),'POST',{code:f.get('code'),paymentReceived:f.get('paymentReceived')==='on'});await refresh();notify('Pickup completed and counter payment recorded.');}
         else if(form.id==='incident-form'){const itemId=String(f.get('itemId')??'');await api(vendorPath('incidents'),'POST',{itemIds:itemId?[itemId]:[],reason:f.get('reason'),delayMinutes:Number(f.get('delayMinutes'))});s.recovery={};await refresh();notify('Delay reported. Affected order estimates updated.');}
@@ -187,16 +331,26 @@ async function boot(): Promise<void> {
     try {
         s.config=await api<AppConfig>('/api/config');
         if(s.config.mode!=='local')throw new Error('This release uses AUTH_MODE=local and JSON storage. Cloud and Enterprise migration is deferred; see docs/LOCAL_MVP.md.');
-        s.actor=await restore();if(s.actor?.role==='vendor')s.view='vendor';else if(new URLSearchParams(location.search).get('view')==='inbox'){s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';}await refresh();await refreshPush(s.actor);
+        setActor(await restore());if(s.actor?.role==='vendor')s.view='vendor';else if(new URLSearchParams(location.search).get('view')==='inbox'){s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';}await refresh();await refreshPush(s.actor);
         if(attempt&&attempt.actorId===s.actor?.id){const prior=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(attempt.key)}`);if(prior.checkout){confirmed(prior.checkout);await refresh();}else s.uncertain=true;}
         render();
         setInterval(()=>{if(refreshing||s.busy||s.scanner)return;refreshing=true;
-            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint()});
-            void refresh().then(()=>{const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint()});const editing=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName??'');if(before!==after&&!editing&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}).catch(e=>{if(e instanceof ApiError&&e.status===401){s.actor=null;s.snapshot=null;s.auth='login';s.authError='Your session expired. Please sign in again.';render();}else{if(!s.offline){s.offline=true;if(!s.auth&&!s.quote&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}}}).finally(()=>refreshing=false);
+            const generation=actorGeneration;
+            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
+            void refresh().then(()=>{
+                if(generation!==actorGeneration){if(!s.busy)render();return;}
+                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
+                const active=document.activeElement;
+                const editing=['INPUT','TEXTAREA','SELECT'].includes(active?.tagName??'')||Boolean(active?.closest('.bb-timetable, #plan-form'));
+                if(before!==after&&!editing&&!s.busy&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();
+            }).catch(e=>{
+                if(e instanceof ApiError&&[401,403].includes(e.status)&&s.auth==='login')render();
+                else if(!s.offline){s.offline=true;if(!s.busy&&!s.auth&&!s.quote&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();}
+            }).finally(()=>refreshing=false);
         },5000);
     }catch(e){root.innerHTML=`<main class="bb-empty"><h1>Unable to open BreakBite</h1><p>${esc(e instanceof Error?e.message:'Please restart the application.')}</p><a href="/" class="bb-button primary">Try again</a></main>`;}
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
-    if(event.data?.type==='OPEN_INBOX'){if(s.actor?.role==='vendor')return;s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';void refreshPush(s.actor).then(()=>render());render();}
+    if(event.data?.type==='OPEN_INBOX'){if(s.actor?.role==='vendor')return;navigate(s.actor?'inbox':'explore');if(!s.actor)s.auth='login';void refreshPush(s.actor).then(()=>render());render();}
 });
 void boot();

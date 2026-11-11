@@ -19,7 +19,7 @@ def bundle(entry='web/main.js'):
             raise ValueError('Only this build is allowed')
         if path in modules: return modules[path]
         name = f'M{len(modules)}'; modules[path] = name
-        source = path.read_text()
+        source = path.read_text(encoding='utf-8')
         pattern = re.compile(r'^import\s+\{([^}]+)\}\s+from\s+[\'\"]([^\'\"]+)[\'\"];\s*$', re.M)
         def imports(m):
             dep = visit((path.parent / m.group(2)).resolve().relative_to(ROOT / 'dist'))
@@ -28,7 +28,7 @@ def bundle(entry='web/main.js'):
         source = pattern.sub(imports, source)
         exports = re.findall(r'^export\s+(?:async\s+)?(?:function|class|const|let)\s+(\w+)', source, re.M)
         source = source.replace('export ', '')
-        if str(relative) == 'web/main.js': source += '\nwindow.__testView = () => ({view:s.view,busy:s.busy,editing:s.editing,actor:s.actor});'
+        if Path(relative).as_posix() == 'web/main.js': source += '\nwindow.__testView = () => ({view:s.view,busy:s.busy,editing:s.editing,actor:s.actor});'
         chunks.append(f'const {name} = (() => {{\n{source}\nreturn {{{",".join(exports)}}};\n}})();')
         return name
     visit(entry)
@@ -51,7 +51,7 @@ def boot(page, base_url, bridge=False):
         except urllib.error.HTTPError as e: return {'status': e.code, 'body': e.read().decode(), 'headers': dict(e.headers)}
     page.expose_function('__localBackend', backend)
     page.set_content('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><a class="skip-link" href="#main">Skip to content</a><div id="app"></div><div id="toast" role="status" aria-live="polite"></div></body></html>')
-    for file in ['styles.css', 'product.css']: page.add_style_tag(content=(ROOT / 'src/web' / file).read_text())
+    for file in ['styles.css', 'product.css']: page.add_style_tag(content=(ROOT / 'src/web' / file).read_text(encoding='utf-8'))
     page.evaluate('''() => { const values = new Map(); Object.defineProperty(window,'sessionStorage',{value:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,String(v)),removeItem:k=>values.delete(k)}}); window.fetch=async(url,options={})=>{const r=await window.__localBackend(String(url),{method:options.method||'GET',headers:options.headers||{},body:options.body});return new Response(r.body,{status:r.status,headers:r.headers});}; }''')
     page.add_script_tag(content=bundle())
 

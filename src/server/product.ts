@@ -1,8 +1,10 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Actor, MenuItem, Order, PublicOrder, Selection, Slot } from '../shared/model.js';
-import { emptyProfile, foodCheck, isClosed, type Notice, type StudentProfile } from '../shared/features.js';
+import type { Actor, ApspaceConnection, ApspaceSelection, ApspaceSource, MenuItem, Order, PublicOrder, Selection, Slot } from '../shared/model.js';
+import { emptyProfile, foodCheck, isClosed, type ApspacePreview, type ClassEvent, type Notice, type StudentProfile } from '../shared/features.js';
+import { malaysiaDate } from '../shared/timetable.js';
+import type { ApspaceProvider, ApspaceSnapshot } from './apspace-timetable.js';
 import { LocalDatabase, DraftStore, assertPickupItinerary, type LocalData } from './local-database.js';
 import { MealService, safeOrder, parseSelections } from './domain.js';
 import { integer, iso, object, requireThat, text } from './errors.js';
@@ -13,6 +15,39 @@ const minute = 60000;
 const stamp = (now: number) => new Date(now).toISOString();
 const student = (a: Actor) => requireThat(a.role === 'student', 'FORBIDDEN', 'A student account is required.', 403);
 function profile(d: LocalData, actor: Actor): StudentProfile { student(actor); d.profiles ??= {}; return d.profiles[actor.id] ??= emptyProfile(); }
+const apspaceFreshFor = 12 * 60 * minute;
+const malaysiaMidnight = (now: number) => Date.parse(`${malaysiaDate(stamp(now))}T00:00:00+08:00`);
+function classDates(event: ClassEvent): string[] {
+    const start = malaysiaDate(event.startAt);
+    const end = malaysiaDate(stamp(Date.parse(event.endAt) - 1));
+    return start === end ? [start] : [start, end];
+}
+function reviewIds(events: ClassEvent[], coveredDates: string[]): Record<string, string[]> {
+    const reviewed = Object.fromEntries(coveredDates.map(date => [date, [] as string[]]));
+    for (const event of events) for (const date of classDates(event)) reviewed[date]?.push(event.id);
+    for (const ids of Object.values(reviewed)) ids.sort();
+    return reviewed;
+}
+function apspaceSelection(snapshot: ApspaceSnapshot, selection: ApspaceSelection, now: number) {
+    const result = snapshot.select(selection.intake, selection.group);
+    const dayStart = malaysiaMidnight(now);
+    const events = result.events.filter(event => Date.parse(event.endAt) > dayStart);
+    requireThat(events.length > 0 && events.length <= 1000, 'APSPACE_COVERAGE', 'APSpace has no usable upcoming classes for that intake and group.', 422);
+    const coveredDates = [...new Set(events.flatMap(classDates))].sort();
+    const source: ApspaceSource = {
+        intake: selection.intake, group: selection.group, sourceRevision: snapshot.revision,
+        firstDate: coveredDates[0]!, lastDate: coveredDates.at(-1)!, coveredDates,
+        ...(snapshot.publishedAt ? { publishedAt: snapshot.publishedAt } : {}),
+    };
+    return { events, source, checkedAt: snapshot.checkedAt };
+}
+function clearApspace(p: StudentProfile): void {
+    p.classes = p.classes.filter(event => event.source !== 'apspace');
+    p.apspaceGeneration = randomUUID();
+    delete p.apspace;
+    delete p.apspacePreview;
+    delete p.apspaceReviewed;
+}
 function owned(d: LocalData, a: Actor, vendorId: string, orderId: string): Order {
     const order = d.vendors[vendorId]?.orders.find(o => o.id === orderId);
     requireThat(order && (a.role === 'student' ? order.studentId === a.id : a.role === 'vendor' && a.vendorId === vendorId), 'NOT_FOUND', 'Order not found.', 404);
@@ -39,10 +74,16 @@ function itinerary(d: LocalData, o: Order): void {
     assertPickupItinerary(windows, checkout.transferMinutes ?? 2);
 }
 export class ProductService {
-    constructor(readonly db: LocalDatabase, private clock = Date.now) {}
+    constructor(readonly db: LocalDatabase, private clock = Date.now, private apspaceProvider?: ApspaceProvider) {}
+    get apspaceConfigured(): boolean { return Boolean(this.apspaceProvider); }
     profile(a: Actor): { profile: StudentProfile; notices: Notice[] } {
         const d = this.db.read(); const p = profile(d, a);
         // Preview data is private to this account; never exposed to kitchens or other students.
+        if (p.apspace && (!this.apspaceConfigured || this.clock() - Date.parse(p.apspace.lastSuccessfulAt) > apspaceFreshFor)) {
+            p.apspace.status = 'unavailable';
+        }
+        delete p.apspaceReviewed;
+        delete p.apspaceGeneration;
         return { profile: p, notices: (d.notices ?? []).filter(n => n.studentId === a.id).slice(-100).reverse() };
     }
     loads() { return Object.values(this.db.read().vendors).map(s => bookingLoad(s, this.clock())); }
@@ -123,6 +164,165 @@ export class ProductService {
             p.classes = [...classes.values()].sort((a, b) => a.startAt.localeCompare(b.startAt)); p.importedAt = stamp(this.clock()); p.importHorizonEnd = preview.horizonEnd; delete p.preview;
         });
     }
+    private apspaceSource(): ApspaceProvider {
+        requireThat(this.apspaceProvider, 'APSPACE_DISABLED', 'Automatic APSpace import is disabled on this installation.', 503);
+        return this.apspaceProvider;
+    }
+    async apspaceOptions(a: Actor) {
+        student(a);
+        return (await this.apspaceSource().get()).options;
+    }
+    async previewApspace(a: Actor, input: unknown): Promise<ApspacePreview> {
+        student(a);
+        const b = object(input);
+        const selection = { intake: text(b.intake, 'Intake', 1, 120), group: text(b.group, 'Group', 1, 60) };
+        const before = this.db.read().profiles?.[a.id];
+        const source = await this.apspaceSource().get();
+        const candidate = apspaceSelection(source, selection, this.clock());
+        const preview: ApspacePreview = {
+            ...candidate.source, kind: 'connect', id: randomUUID(), expiresAt: stamp(this.clock() + 15 * minute),
+            checkedAt: candidate.checkedAt, events: candidate.events, affectedDates: [],
+            selectedIds: candidate.events.map(event => event.id),
+        };
+        await this.db.transaction(d => {
+            const p = profile(d, a);
+            requireThat(p.apspaceGeneration === before?.apspaceGeneration && p.apspacePreview?.id === before?.apspacePreview?.id,
+                'APSPACE_CHANGED', 'The timetable changed while loading. Preview it again.', 409);
+            p.apspacePreview = preview;
+        });
+        return preview;
+    }
+    async confirmApspace(a: Actor, input: unknown): Promise<void> {
+        student(a);
+        const b = object(input);
+        requireThat(b.consent === true, 'CONSENT_REQUIRED', 'Confirm that the selected classes apply to you.', 400);
+        const before = this.db.read().profiles?.[a.id]?.apspacePreview;
+        requireThat(before && before.id === b.previewId && Date.parse(before.expiresAt) > this.clock(),
+            'PREVIEW_EXPIRED', 'Preview the APSpace timetable again before importing.', 409);
+        const snapshot = await this.apspaceSource().get();
+        const candidate = apspaceSelection(snapshot, before, this.clock());
+        requireThat(snapshot.revision === before.sourceRevision, 'APSPACE_CHANGED', 'APSpace changed while you were reviewing. Open a fresh preview.', 409);
+        await this.db.transaction(d => {
+            const p = profile(d, a);
+            const preview = p.apspacePreview;
+            requireThat(preview && preview.id === b.previewId && Date.parse(preview.expiresAt) > this.clock(),
+                'PREVIEW_EXPIRED', 'Preview the APSpace timetable again before importing.', 409);
+            const candidates = new Set(preview.events.map(event => event.id));
+            requireThat(Array.isArray(b.ids) && b.ids.length <= 1000 && (preview.kind === 'update' || b.ids.length > 0)
+                && b.ids.every(id => typeof id === 'string' && candidates.has(id)),
+                'INVALID_CLASSES', 'Select valid preview classes.', 400);
+            const selected = new Set(b.ids as string[]);
+            const { intake, group, sourceRevision, firstDate, lastDate, coveredDates, publishedAt } = preview;
+            const dayStart = malaysiaMidnight(this.clock());
+            const keep = p.classes.filter(event => event.source !== 'apspace' ||
+                (preview.kind === 'update' && Date.parse(event.endAt) > dayStart
+                    && classDates(event).every(date => !coveredDates.includes(date))));
+            const classes = [...keep, ...preview.events.filter(event => selected.has(event.id))];
+            requireThat(classes.length <= 1000, 'LIMIT', 'The timetable supports 1,000 occurrences.', 400);
+            p.classes = classes.sort((x, y) => x.startAt.localeCompare(y.startAt));
+            const revision = randomUUID();
+            p.apspace = {
+                intake, group, sourceRevision, firstDate, lastDate, coveredDates, publishedAt, revision,
+                lastCheckedAt: candidate.checkedAt, lastSuccessfulAt: candidate.checkedAt, status: 'current',
+            };
+            p.apspaceGeneration = revision;
+            p.apspaceReviewed = reviewIds(preview.events, coveredDates);
+            delete p.apspacePreview;
+        });
+    }
+    async disconnectApspace(a: Actor): Promise<void> {
+        await this.db.transaction(d => clearApspace(profile(d, a)));
+    }
+    async discardApspacePreview(a: Actor, input: unknown): Promise<void> {
+        const b = object(input);
+        await this.db.transaction(d => {
+            const p = profile(d, a);
+            requireThat(p.apspacePreview?.kind === 'connect' && p.apspacePreview.id === b.previewId,
+                'PREVIEW_EXPIRED', 'The APSpace setup preview has already changed.', 409);
+            delete p.apspacePreview;
+        });
+    }
+    async refreshApspace(a?: Actor): Promise<void> {
+        if (a) student(a);
+        const provider = this.apspaceSource();
+        const before = Object.entries(this.db.read().profiles ?? {}).filter(([id, p]) => p.apspace && (!a || a.id === id));
+        if (!before.length) return;
+        let snapshot: ApspaceSnapshot;
+        try {
+            snapshot = await provider.get(Boolean(a));
+        } catch (error) {
+            const affected = before.filter(([, p]) => p.apspace?.status !== 'unavailable');
+            if (affected.length) await this.db.transaction(d => {
+                for (const [id, previous] of affected) {
+                    const connection = d.profiles?.[id]?.apspace;
+                    if (connection && connection.revision === previous.apspace?.revision &&
+                        connection.lastCheckedAt === previous.apspace.lastCheckedAt) {
+                        connection.status = 'unavailable';
+                        connection.lastCheckedAt = stamp(this.clock());
+                    }
+                }
+            });
+            if (a) throw error;
+            return;
+        }
+        const now = this.clock();
+        const results = before.flatMap<{ id: string; previous: ApspaceConnection; candidate?: ReturnType<typeof apspaceSelection> }>(([id, p]) => {
+            const connection = p.apspace!;
+            const expired = p.apspacePreview && Date.parse(p.apspacePreview.expiresAt) <= now;
+            const reconsider = (p.apspacePreview?.kind === 'update' && expired) ||
+                (connection.status === 'unavailable' && (!p.apspacePreview || expired)
+                    && snapshot.checkedAt === connection.lastCheckedAt && snapshot.revision !== connection.sourceRevision);
+            if (connection.lastCheckedAt >= snapshot.checkedAt &&
+                !reconsider) return [];
+            try { return [{ id, previous: connection, candidate: apspaceSelection(snapshot, connection, now) }]; }
+            catch { return connection.lastCheckedAt >= snapshot.checkedAt ? [] : [{ id, previous: connection }]; }
+        });
+        if (!results.length) return;
+        await this.db.transaction(d => {
+            for (const { id, previous, candidate } of results) {
+                const p = d.profiles?.[id];
+                const connection = p?.apspace;
+                if (!p || !connection || connection.revision !== previous.revision || connection.lastCheckedAt !== previous.lastCheckedAt) continue;
+                if (!candidate) {
+                    connection.lastCheckedAt = snapshot.checkedAt;
+                    connection.status = 'unavailable';
+                    continue;
+                }
+                this.stageApspaceUpdate(p, candidate, now);
+            }
+        });
+    }
+    private stageApspaceUpdate(p: StudentProfile, candidate: ReturnType<typeof apspaceSelection>, now: number): void {
+        const connection = p.apspace!;
+        const { source, events, checkedAt } = candidate;
+        const previousIds = p.apspaceReviewed ?? reviewIds(p.classes.filter(event => event.source === 'apspace'), connection.coveredDates);
+        const nextIds = reviewIds(events, source.coveredDates);
+        const changed = source.coveredDates.filter(date => JSON.stringify(previousIds[date] ?? []) !== JSON.stringify(nextIds[date]));
+        const pending = p.apspacePreview;
+        connection.lastCheckedAt = checkedAt;
+        connection.lastSuccessfulAt = checkedAt;
+        if (pending?.kind === 'connect' && Date.parse(pending.expiresAt) > now) {
+            if (changed.length || connection.coveredDates.some(date => !source.coveredDates.includes(date))) connection.status = 'unavailable';
+            return;
+        }
+        connection.status = changed.length ? 'review' : 'current';
+        if (!changed.length) {
+            Object.assign(connection, source, { publishedAt: source.publishedAt });
+            p.apspaceReviewed = nextIds;
+            const dayStart = malaysiaMidnight(now);
+            p.classes = p.classes.filter(event => event.source !== 'apspace' || Date.parse(event.endAt) > dayStart);
+            delete p.apspacePreview;
+            return;
+        }
+        if (pending?.kind === 'update' && pending.sourceRevision === source.sourceRevision && Date.parse(pending.expiresAt) > now) return;
+        const accepted = new Set(p.classes.filter(event => event.source === 'apspace').map(event => event.id));
+        const reviewed = new Set(Object.values(previousIds).flat());
+        p.apspacePreview = {
+            ...source, id: randomUUID(), kind: 'update', checkedAt, expiresAt: stamp(now + 15 * minute),
+            events, affectedDates: [...new Set([...changed, ...connection.coveredDates.filter(date => !source.coveredDates.includes(date))])].sort(),
+            selectedIds: events.filter(event => accepted.has(event.id) || !reviewed.has(event.id)).map(event => event.id),
+        };
+    }
     async manualClass(a: Actor, input: unknown): Promise<void> {
         const b = object(input); const startAt = iso(b.startAt, 'Class start'); const endAt = iso(b.endAt, 'Class end'); const weeks = integer(b.weeks ?? 1, 'Weeks', 1, 13);
         requireThat(endAt > startAt && Date.parse(endAt) - Date.parse(startAt) <= 86400000, 'INVALID_CLASS', 'Use a positive class duration of at most one day.');
@@ -141,7 +341,7 @@ export class ProductService {
     async deleteClass(a: Actor, input: unknown): Promise<void> {
         const b = object(input); await this.db.transaction(d => {
             const p = profile(d, a);
-            if (b.all === true) { p.classes = []; delete p.importedAt; delete p.importHorizonEnd; delete p.preview; }
+            if (b.all === true) { clearApspace(p); p.classes = []; delete p.importedAt; delete p.importHorizonEnd; delete p.preview; }
             else { const id = text(b.id, 'Class ID'); p.classes = p.classes.filter(e => e.id !== id); }
         });
     }

@@ -44,7 +44,11 @@ export function validatePushKeys(input: unknown): PushKeys {
 }
 export function generatePushKeys(subject: string): PushKeys {
     const e = createECDH('prime256v1'); e.generateKeys();
-    return validatePushKeys({ publicKey: e.getPublicKey().toString('base64url'), privateKey: e.getPrivateKey().toString('base64url'), subject });
+    // Node's ECDH scalar can omit leading zero bytes. P-256 JWKs require 32 bytes.
+    const scalar = e.getPrivateKey();
+    const privateKey = Buffer.alloc(32);
+    scalar.copy(privateKey, privateKey.length - scalar.length);
+    return validatePushKeys({ publicKey: e.getPublicKey().toString('base64url'), privateKey: privateKey.toString('base64url'), subject });
 }
 export async function loadPushKeys(directory: string, enabled = process.env.PUSH_ENABLED === 'true'): Promise<PushKeys | undefined> {
     if (!enabled) return undefined;

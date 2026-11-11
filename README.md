@@ -37,7 +37,7 @@ npm start
 | Campus content | Editable kitchen campus/location/menu source, permission-confirmed local photograph uploads, responsive APU-focused interface. |
 | Availability | Dedicated **Availability** tab, separate from Explore. Current online kitchen/counter allocation and next available windows; no claim to measure the physical queue or predict demand. |
 | Collection policies | Configurable ordering/cancellation cutoffs, snapshotted order rules, server-generated ready/due/overdue reminders, merchant-confirmed uncollected closure and corrections. |
-| Timetable | Manual classes, optional weekly repetitions, bounded `.ics` preview/selection/import, delete controls and suggested timetable gaps. No APSpace credentials or live sync. |
+| Timetable | Manual classes and `.ics` imports, plus opt-in APSpace import by typed intake code and group. Review classes once, then use saved gaps in the planner or basket. Changes require review. |
 | Deadline help | Move a not-yet-preparing order into genuinely free earlier capacity, or request reviewed alternatives. Other students are never pushed back. |
 | Kitchen operations | Menu/stock editing, preparation queue, pause/reopen, capacity settings, delays, consent-based alternatives, collection and operation history. |
 
@@ -103,7 +103,7 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm
 
 ## Verification and guides
 
-- `npm run check`: type checking, **128 automated tests**, production build.
+- `npm run check`: type checking, **156 automated tests**, production build.
 - Original and v0.3 browser journeys passed in an isolated renderer/local-API bridge at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, normal browser networking/TLS, real Google accounts and public deployment are not claimed tested.
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)

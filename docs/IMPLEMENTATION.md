@@ -71,7 +71,8 @@
 - 256 KB input, 1,000 source/expanded events, 90-day horizon, 15-minute private previews.
 - UTC/Malaysia/Singapore times; DAILY/WEEKLY recurrence, interval/count/until/weekdays, EXDATE/RDATE and individual changed/cancelled instances.
 - Unsupported/all-day/invalid series are warned and skipped as a unit, never guessed.
-- No remote calendar fetch, APSpace password, automatic account linkage or live sync.
+- An opt-in APSpace pilot uses a fixed public intake feed. The student types their intake code, selects the group and confirms an account-owned preview. A shared server cache checks for changes and stages affected dates for review. The basket uses confirmed gaps from the saved planner.
+- An unavailable source or unconfirmed change suppresses affected suggestions. A refresh preserves checkout retry records and accepted orders. The provider uses public timetable rows without requiring APSpace credentials.
 - Timetable gaps populate an optional break plan, not a capacity guarantee.
 
 ## Browser and operational limits
