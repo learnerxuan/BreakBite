@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11T21:42:35.9413826+08:00",
+  "title": "Design System: BreakBite",
+  "extensions": {
+    "colorMeta": {
+      "campus-green": {
+        "role": "primary",
+        "displayName": "Campus Green",
+        "canonical": "#183c31",
+        "tonalRamp": ["#071c16", "#123027", "#245345", "#3e7464", "#6a9787", "#9fc0b5", "#d0e0da", "#edf5f1"]
+      },
+      "pickup-orange": {
+        "role": "secondary",
+        "displayName": "Pickup Orange",
+        "canonical": "#dc552e",
+        "tonalRamp": ["#351109", "#6f2414", "#a43a20", "#dc552e", "#e87958", "#efa38a", "#f7cfc0", "#fdf0eb"]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#fbfaf6",
+        "tonalRamp": ["#282723", "#4d4c47", "#74726b", "#9b9991", "#c2c0b8", "#dedcd5", "#f0eee8", "#fbfaf6"]
+      },
+      "fresh-mint": {
+        "role": "neutral",
+        "displayName": "Fresh Mint",
+        "canonical": "#eaf1e7",
+        "tonalRamp": ["#172016", "#354333", "#566653", "#798a75", "#9fae9b", "#c4d0c0", "#e1e9de", "#f3f7f1"]
+      },
+      "quiet-text": {
+        "role": "neutral",
+        "displayName": "Quiet Text",
+        "canonical": "#67756c",
+        "tonalRamp": ["#151a17", "#303a34", "#4b5951", "#67756c", "#89968e", "#aeb8b2", "#d5dbd7", "#f0f3f1"]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e6e7df",
+        "tonalRamp": ["#20211e", "#44453f", "#696a63", "#909189", "#b5b6ae", "#d4d5cd", "#e6e7df", "#f7f8f3"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Task Display", "purpose": "Task-first page headings." },
+      "title": { "displayName": "Meal Title", "purpose": "Meal and section titles in dense registers." },
+      "body": { "displayName": "Product Body", "purpose": "Readable operational and explanatory copy." },
+      "label": { "displayName": "Operational Label", "purpose": "Kitchen, location, unit and sample metadata." }
+    },
+    "shadows": [
+      { "name": "hover-lift", "value": "0 12px 28px #183c310b", "purpose": "Subtle legacy card hover feedback." },
+      { "name": "mobile-dock", "value": "0 8px 30px #183c3133", "purpose": "Fixed mobile basket shortcut." },
+      { "name": "action-shelf", "value": "0 -10px 22px #183c310a", "purpose": "Pinned basket actions above scrollable contents." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "160ms ease", "purpose": "Hover background, lift and shadow feedback; disabled under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "compact-desktop", "value": "1180px" },
+      { "name": "single-column", "value": "860px" },
+      { "name": "mobile", "value": "600px" },
+      { "name": "narrow-mobile", "value": "360px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Orange transactional action with a compact squared silhouette.",
+      "html": "<button class=\"ds-btn-primary\">Search</button>",
+      "css": ".ds-btn-primary{min-height:44px;padding:11px 18px;border:1px solid transparent;border-radius:8px;background:#dc552e;color:#fff;font:700 12px/1.3 Inter,system-ui,sans-serif;transition:background .16s}.ds-btn-primary:hover{background:#ba3f1d}.ds-btn-primary:focus-visible{outline:3px solid #ea9b49;outline-offset:3px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet bordered action for reversible or supporting choices.",
+      "html": "<button class=\"ds-btn-secondary\">All kitchens</button>",
+      "css": ".ds-btn-secondary{min-height:44px;padding:11px 18px;border:1px solid #e6e7df;border-radius:8px;background:#fff;color:#183c31;font:700 12px/1.3 Inter,system-ui,sans-serif;transition:background .16s}.ds-btn-secondary:hover{background:#f6f7f0}.ds-btn-secondary:focus-visible{outline:3px solid #ea9b49;outline-offset:3px}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "White, hairline-bordered field used at the start of food-finding tasks.",
+      "html": "<input class=\"ds-search\" type=\"search\" placeholder=\"Search meals, drinks or kitchens\">",
+      "css": ".ds-search{width:100%;min-height:44px;padding:11px 14px;border:1px solid #cfd7cc;border-radius:8px;background:#fff;color:#183c31;font:400 13px/1.4 Inter,system-ui,sans-serif}.ds-search:focus-visible{outline:3px solid #ea9b49;outline-offset:3px}"
+    },
+    {
+      "name": "Category Chip",
+      "kind": "chip",
+      "refersTo": "chip-active",
+      "description": "Compact category selector with strong active inversion.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-active\">All</button><button class=\"ds-chip\">Rice</button></div>",
+      "css": ".ds-chips{display:flex;gap:8px}.ds-chip{min-height:44px;padding:8px 14px;border:1px solid #e6e7df;border-radius:6px;background:#fff;color:#67756c;font:500 12px Inter,system-ui,sans-serif}.ds-chip.ds-active{border-color:#183c31;background:#183c31;color:#fff}.ds-chip:focus-visible{outline:3px solid #ea9b49;outline-offset:3px}"
+    },
+    {
+      "name": "Preparation-Time Rail",
+      "kind": "custom",
+      "description": "Signature 1–12 minute comparison scale with grouped orange counts.",
+      "html": "<section class=\"ds-rail\"><div class=\"ds-rail-head\"><strong>Preparation time</strong><span>5 meals</span></div><div class=\"ds-scale\"><b style=\"left:0\">1</b><b style=\"left:45%\">2</b><b style=\"left:64%\">2</b></div><small>Orange numbers show meals sharing an estimate.</small></section>",
+      "css": ".ds-rail{padding:13px 16px 10px;border:1px solid #cfd7cc;border-radius:9px;background:#fff;color:#183c31;font-family:Inter,system-ui,sans-serif}.ds-rail-head{display:flex;justify-content:space-between;font-size:12px}.ds-rail-head span,.ds-rail small{color:#67756c;font-size:10px}.ds-scale{position:relative;height:50px;margin:8px 0;background:repeating-linear-gradient(90deg,#e8ece6 0 1px,transparent 1px 9.09%)}.ds-scale b{position:absolute;top:1px;min-width:18px;height:18px;display:grid;place-items:center;border-radius:9px;background:#dc552e;color:#fff;font-size:9px;transform:translateX(-50%)}"
+    },
+    {
+      "name": "Meal Register Row",
+      "kind": "card",
+      "description": "Hairline-separated meal registration with aligned prep, price and action.",
+      "html": "<article class=\"ds-meal\"><div class=\"ds-photo\"></div><div><small>ASIAN CUISINE · CAFETERIA (LEVEL 3)</small><h3>Nasi lemak ayam</h3><p>Coconut rice with sambal, egg and fried chicken.</p><em>Contains: eggs, peanuts.</em></div><strong class=\"ds-min\">8 <small>MIN</small></strong><div class=\"ds-price\"><b>RM 10.50</b><button>+ Add</button></div></article>",
+      "css": ".ds-meal{display:grid;grid-template-columns:126px 1fr 68px 92px;gap:15px;align-items:center;padding:12px 4px;border-bottom:1px solid #e6e7df;color:#183c31;font-family:Inter,system-ui,sans-serif}.ds-photo{height:104px;border-radius:8px;background:#f1ead8}.ds-meal h3{margin:4px 0 3px;font-size:17px}.ds-meal p,.ds-meal em,.ds-meal small{display:block;margin:3px 0;color:#67756c;font-size:10px}.ds-min{text-align:right;font-size:25px}.ds-min small{font-size:9px}.ds-price{display:grid;justify-items:end;gap:7px}.ds-price button{min-height:44px;border:0;border-radius:6px;background:#fcede6;color:#b64422;font-weight:750}"
+    },
+    {
+      "name": "Basket Panel",
+      "kind": "card",
+      "description": "Sticky ordering panel with scrollable contents and pinned checkout action.",
+      "html": "<aside class=\"ds-basket\"><header><h2>Your basket <span>2</span></h2><small>Build one pickup across campus kitchens.</small></header><div class=\"ds-basket-body\">Golden chicken rice<br>Sesame tofu bowl</div><footer><button>Choose pickup times</button></footer></aside>",
+      "css": ".ds-basket{width:330px;max-height:520px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e6e7df;border-radius:10px;background:#fff;color:#183c31;font-family:Inter,system-ui,sans-serif}.ds-basket header{padding:19px 24px 12px}.ds-basket h2{margin:0;font-size:20px}.ds-basket h2 span{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:#eaf1e7;font-size:11px}.ds-basket-body{min-height:120px;overflow:auto;padding:12px 24px;line-height:2}.ds-basket footer{padding:12px 24px 20px;border-top:1px solid #e6e7df;box-shadow:0 -10px 22px #183c310a}.ds-basket footer button{width:100%;min-height:44px;border:0;border-radius:7px;background:#dc552e;color:#fff;font-weight:700}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calibrated Lunch Counter",
+    "overview": "BreakBite combines the warmth of a familiar campus food counter with the precision of an operating timetable. Warm paper and food photography keep the system approachable; deep green structure, orange actions and fine timing marks make it fast to scan under time pressure. Information density is deliberate: preparation, location, dietary state, price and action should be comparable without turning the interface into a generic marketplace grid. The visual world is flat, practical and specific to campus life. It rejects decorative hero sections, excessive floating cards and unsupported promotional claims.",
+    "keyCharacteristics": [
+      "Warm ivory ground with deep green structure and sparse orange action color.",
+      "Dense, hairline-separated registrations rather than card collections.",
+      "Preparation time expressed as a shared visual scale and tabular figures.",
+      "Food imagery and plain language balancing the technical timing grammar.",
+      "Safety and sample-data states visible at the point of choice."
+    ],
+    "rules": [
+      { "name": "The Orange Means Action Rule", "body": "Use orange for actions, timing marks and the logo accent; do not flood large surfaces with it.", "section": "colors" },
+      { "name": "The Safety Stays Visible Rule", "body": "Dietary tags, declared allergens and unknown states remain legible on desktop and mobile.", "section": "colors" },
+      { "name": "The Number Before Noun Rule", "body": "Preparation minutes and prices use tabular numerals and lead their supporting units or labels.", "section": "typography" },
+      { "name": "The Flat-by-Default Rule", "body": "Use borders and tonal layering at rest; shadows indicate hover or pinned layers, not decoration.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do open food-finding surfaces on the task, filters and comparable meal data.",
+      "Do keep preparation figures, locations, prices and dietary states scannable together.",
+      "Do use Warm Paper, Campus Green and Pickup Orange as the recognizable BreakBite world.",
+      "Do keep mobile controls comfortable and basket checkout actions reachable with long orders.",
+      "Do use real food imagery with truthful sample and provenance labels."
+    ],
+    "donts": [
+      "Don't reintroduce a decorative marketing hero above the ordering task.",
+      "Don't turn every result into an isolated rounded card or add shadows without a state purpose.",
+      "Don't hide allergen, unknown or sample-menu states on narrow screens.",
+      "Don't invent nutrition, certification, availability or waiting-time claims.",
+      "Don't use orange as a broad background treatment; its scarcity makes actions clear."
+    ]
+  }
+}
