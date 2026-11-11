@@ -12,7 +12,7 @@ const db = new LocalDatabase(full);
 await db.open();
 try {
     const accounts = new Accounts(db);
-    for (const [vendorId, email] of [['bowl-lab', 'operator.bowl@example.test'], ['noodle-co', 'operator.noodle@example.test']]) {
+    for (const [vendorId, email] of [['asian-cuisine', 'operator.bowl@example.test'], ['bobanika', 'operator.noodle@example.test']]) {
         await accounts.create({ vendorId, email, name: 'Test kitchen operator', role: 'vendor', password: process.env.TEST_OPERATOR_PASSWORD ?? 'Fixture-only-password-2026' });
     }
 } finally { await db.close(); }

@@ -21,10 +21,12 @@ with sync_playwright() as playwright:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('dialog', lambda dialog: dialog.accept())
     page.goto(args.base_url)
+    expect(page.locator('#kitchen-filter')).not_to_contain_text('Bowl Lab')
+    expect(page.locator('#kitchen-filter')).not_to_contain_text('Noodle & Co.')
     photos = page.locator('.bb-meal img[src^="/images/menu/"]')
     expect(photos).to_have_count(45)
     catalog = page.request.get(args.base_url + '/api/catalog').json()
-    assert len(catalog['vendors']) == 11
+    assert len(catalog['vendors']) == 9
     for item in catalog['items']:
         if not item.get('photoPath', '').startswith('/images/menu/'):
             continue
@@ -41,7 +43,7 @@ with sync_playwright() as playwright:
     expect(photos).to_have_count(45)
     page.locator('#kitchen-filter').select_option('asian-cuisine')
     expect(page.locator('.bb-meal')).to_have_count(5)
-    expect(page.locator('.bb-kitchen-name').first).to_contain_text('Sample menu')
+    expect(page.locator('.bb-kitchen-name').first).not_to_contain_text('Sample menu')
     page.locator('#kitchen-filter').select_option('all')
 
     login(page, f'campus-{uuid4().hex[:8]}@example.test', register=True)
@@ -72,5 +74,5 @@ with sync_playwright() as playwright:
     expect(first).to_contain_text('Cancelled')
     expect(sibling).to_contain_text('Confirmed')
     assert not errors, errors
-    print('PASS 11 kitchens, all 45 JPEGs, sample labels, fail-closed allergy filters, combined mobile basket, two added-kitchen checkout and independent cancellation over browser HTTP.')
+    print('PASS 9 kitchens, all 45 JPEGs, sample labels, fail-closed allergy filters, combined mobile basket, two added-kitchen checkout and independent cancellation over browser HTTP.')
     browser.close()

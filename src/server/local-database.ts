@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import type { Actor, Slot, VendorState } from '../shared/model.js';
 import type { Store } from './store.js';
 import { requireThat } from './errors.js';
-import { seedVendor, VENDOR_IDS } from './seed.js';
+import { seedVendor, VENDOR_IDS, ALL_VENDOR_IDS, LEGACY_VENDOR_IDS } from './seed.js';
 
 export interface LocalAccount {
     id: string; email: string; name: string; role: 'student' | 'vendor'; vendorId?: string;
@@ -26,6 +26,19 @@ export interface LocalData {
 }
 export const accountActor = (a: LocalAccount): Actor => ({ id: a.id, name: a.name, role: a.role, ...(a.vendorId ? { vendorId: a.vendorId } : {}) });
 
+function retireLegacyKitchens(data: LocalData): boolean {
+    let changed = false;
+    for (const id of LEGACY_VENDOR_IDS) {
+        const vendor = data.vendors[id]?.vendor;
+        if (vendor && (!vendor.archived || vendor.open)) {
+            vendor.archived = true;
+            vendor.open = false;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 export function assertPickupItinerary(windows: Slot[], transferMinutes: number): void {
     const sorted = [...windows].sort((a, b) => a.startAt.localeCompare(b.startAt) || a.endAt.localeCompare(b.endAt));
     let previousEnd = 0;
@@ -36,8 +49,66 @@ export function assertPickupItinerary(windows: Slot[], transferMinutes: number):
     }
 }
 
+/** Storage contract shared by the JSON file and Firestore backends.
+ * Transaction work must only mutate the draft: no network or file side effects,
+ * because the Firestore backend re-runs it after a concurrent-write conflict.
+ */
+export interface Database {
+    /** DATA_DIR: uploaded photos and Web Push keys stay on disk for both backends. */
+    readonly directory: string;
+    open(): Promise<void>;
+    read(): LocalData;
+    transaction<T>(work: (draft: LocalData) => T | Promise<T>): Promise<T>;
+    /** Picks up writes made by another process where the backend supports it. */
+    refresh(): Promise<void>;
+    close(): Promise<void>;
+}
+
+export function validateLocalData(data: unknown): asserts data is LocalData {
+    const d = data as LocalData;
+    requireThat(d && d.schemaVersion === 2 && d.vendors && Array.isArray(d.accounts) && d.sessions && d.checkouts, 'INVALID_STORE', 'Unrecognised database.json. Restore a checked backup; the application will not overwrite it.', 500);
+    for (const [id, s] of Object.entries(d.vendors))
+        requireThat(s.schemaVersion === 1 && s.vendor.id === id && Array.isArray(s.orders) && Array.isArray(s.items), 'INVALID_STORE', 'Invalid kitchen data.', 500);
+}
+
+/** A new installation: every sample kitchen, no accounts or orders. */
+export function seededData(): LocalData {
+    const vendors: Record<string, VendorState> = {};
+    for (const id of VENDOR_IDS) vendors[id] = seedVendor(id);
+    return { schemaVersion: 2, vendors, accounts: [], sessions: {}, checkouts: {} };
+}
+
+/** Adds newly introduced sample kitchens without replacing existing operator data. Returns whether anything changed. */
+export function upgradeSeedKitchens(data: LocalData): boolean {
+    let changed = retireLegacyKitchens(data);
+    for (const id of VENDOR_IDS) {
+        if (!data.vendors[id]) { data.vendors[id] = seedVendor(id); changed = true; }
+        else {
+            const fresh = seedVendor(id);
+            const vendor = data.vendors[id]!.vendor;
+            // Reviewed kitchens belong to operators; only upgrade untouched sample placeholders.
+            if (!vendor.synthetic || vendor.menuReviewedAt) continue;
+            if (vendor.location === `APU Food Court · ${fresh.vendor.name}`) {
+                vendor.location = fresh.vendor.location;
+                changed = true;
+            }
+            for (const item of data.vendors[id]!.items) {
+                if (item.foodInfo?.reviewedBy !== 'sample-seed' ||
+                    !/^\/images\/cafeterias\/[a-z0-9-]+\.jpg$/.test(item.photoPath ?? '') ||
+                    item.photoCredit !== 'Photo supplied by the project team; menu item shown may differ.') continue;
+                const replacement = fresh.items.find(candidate => candidate.id === item.id);
+                if (!replacement?.photoPath) continue;
+                item.photoPath = replacement.photoPath;
+                item.photoCredit = replacement.photoCredit;
+                changed = true;
+            }
+        }
+    }
+    return changed;
+}
+
 /** Single-process durable store. A whole checkout is one file replacement, not N kitchen writes. */
-export class LocalDatabase {
+export class LocalDatabase implements Database {
     private value!: LocalData;
     private tail: Promise<unknown> = Promise.resolve();
     private lockToken = randomUUID();
@@ -70,60 +141,32 @@ export class LocalDatabase {
         try {
             try {
                 const data: unknown = JSON.parse(await readFile(this.file('database.json'), 'utf8'));
-                this.validate(data);
+                validateLocalData(data);
                 this.value = data;
-                // Add newly introduced sample kitchens without replacing existing operator data.
                 const migrated = structuredClone(this.value);
-                let changed = false;
-                for (const id of VENDOR_IDS) {
-                    if (!migrated.vendors[id]) { migrated.vendors[id] = seedVendor(id); changed = true; }
-                    else {
-                        const fresh = seedVendor(id);
-                        const vendor = migrated.vendors[id]!.vendor;
-                        // Reviewed kitchens belong to operators; only upgrade untouched sample placeholders.
-                        if (!vendor.synthetic || vendor.menuReviewedAt) continue;
-                        if (vendor.location === `APU Food Court · ${fresh.vendor.name}`) {
-                            vendor.location = fresh.vendor.location;
-                            changed = true;
-                        }
-                        for (const item of migrated.vendors[id]!.items) {
-                            if (item.foodInfo?.reviewedBy !== 'sample-seed' ||
-                                !/^\/images\/cafeterias\/[a-z0-9-]+\.jpg$/.test(item.photoPath ?? '') ||
-                                item.photoCredit !== 'Photo supplied by the project team; menu item shown may differ.') continue;
-                            const replacement = fresh.items.find(candidate => candidate.id === item.id);
-                            if (!replacement?.photoPath) continue;
-                            item.photoPath = replacement.photoPath;
-                            item.photoCredit = replacement.photoCredit;
-                            changed = true;
-                        }
-                    }
-                }
-                if (changed) { await this.persist(migrated, true); this.value = migrated; }
+                if (upgradeSeedKitchens(migrated)) { await this.persist(migrated, true); this.value = migrated; }
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
                 const vendors: Record<string, VendorState> = {};
-                for (const id of VENDOR_IDS) {
+                for (const id of ALL_VENDOR_IDS) {
                     try {
                         const old = JSON.parse(await readFile(this.file(`${id}.json`), 'utf8')) as VendorState;
                         requireThat(old.schemaVersion === 1 && old.vendor.id === id, 'INVALID_STORE', 'Invalid legacy vendor file. Restore from backup; no data has been reset.', 500);
                         vendors[id] = old;
                     } catch (error) {
                         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-                        vendors[id] = seedVendor(id);
+                        if (!LEGACY_VENDOR_IDS.includes(id as typeof LEGACY_VENDOR_IDS[number])) vendors[id] = seedVendor(id);
                     }
                 }
                 this.value = { schemaVersion: 2, vendors, accounts: [], sessions: {}, checkouts: {} };
+                retireLegacyKitchens(this.value);
                 await this.persist(this.value, false);
             }
         } catch (error) { await this.close(); throw error; }
     }
-    private validate(data: unknown): asserts data is LocalData {
-        const d = data as LocalData;
-        requireThat(d && d.schemaVersion === 2 && d.vendors && Array.isArray(d.accounts) && d.sessions && d.checkouts, 'INVALID_STORE', 'Unrecognised database.json. Restore a checked backup; the application will not overwrite it.', 500);
-        for (const [id, s] of Object.entries(d.vendors))
-            requireThat(s.schemaVersion === 1 && s.vendor.id === id && Array.isArray(s.orders) && Array.isArray(s.items), 'INVALID_STORE', 'Invalid kitchen data.', 500);
-    }
     read(): LocalData { return structuredClone(this.value); }
+    /** Single writer: nothing else can change the file while the lock is held. */
+    async refresh(): Promise<void> {}
     async transaction<T>(work: (draft: LocalData) => T | Promise<T>): Promise<T> {
         requireThat(this.acquired, 'STORE_CLOSED', 'The database is closed.', 503);
         const task = this.tail.then(async () => {
@@ -145,7 +188,7 @@ export class LocalDatabase {
         } finally { await unlink(temporary).catch(() => undefined); }
     }
     private async persist(next: LocalData, backup: boolean): Promise<void> {
-        this.validate(next);
+        validateLocalData(next);
         const payload = JSON.stringify(next);
         requireThat(Buffer.byteLength(payload) <= 20 * 1024 * 1024, 'STORE_LIMIT', 'Local storage is full. Archive orders before continuing.', 503);
         if (backup) await this.atomicFile('database.previous.json', JSON.stringify(this.value));
@@ -162,7 +205,7 @@ export class LocalDatabase {
 
 /** Reuses the original order domain while putting all kitchens in the same durable transaction. */
 export class LocalStore implements Store {
-    constructor(readonly db: LocalDatabase) {}
+    constructor(readonly db: Database) {}
     async ids(): Promise<string[]> { return Object.keys(this.db.read().vendors); }
     async read(id: string): Promise<VendorState> {
         const d = this.db.read(); const s = d.vendors[id];

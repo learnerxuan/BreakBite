@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { addLegacyTestKitchens } from './fixtures.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { LocalDatabase, LocalStore } from '../src/server/local-database.js';
+import { LocalStore } from '../src/server/local-database.js';
+import { jsonFile, testDatabase } from './support/test-database.js';
 import { CheckoutService } from '../src/server/checkout.js';
 import { VENDOR_IDS, seedVendor } from '../src/server/seed.js';
 import { foodCheck } from '../src/shared/features.js';
@@ -12,7 +14,7 @@ import { basket, explore } from '../src/web/views/student.js';
 
 async function fixture(t: test.TestContext) {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'breakbite-campus-'));
-    const db = new LocalDatabase(directory);
+    const db = testDatabase(directory);
     await db.open();
     t.after(async () => { await db.close(); await rm(directory, { recursive: true, force: true }); });
     return db;
@@ -20,6 +22,7 @@ async function fixture(t: test.TestContext) {
 
 test('adding campus kitchens preserves existing orders and checkout retry records across reopen', async t => {
     const db = await fixture(t);
+    await addLegacyTestKitchens(db);
     const actor = { id: 'migration-student', name: 'Student', role: 'student' as const };
     const checkout = new CheckoutService(db);
     const groups = ['bowl-lab', 'noodle-co'].map((vendorId, index) => ({ vendorId,
@@ -28,7 +31,7 @@ test('adding campus kitchens preserves existing orders and checkout retry record
     const payload = { groups, plan: { mode: 'pickup', budgetSen: 2500 }, expectedTotalSen: 1250 };
     const order = await checkout.submit(actor, payload, 'migration-checkout');
     await db.transaction(d => {
-        for (const id of VENDOR_IDS) if (id !== 'bowl-lab' && id !== 'noodle-co') delete d.vendors[id];
+        for (const id of VENDOR_IDS) delete d.vendors[id];
         d.vendors['bowl-lab']!.vendor.name = 'Operator-owned kitchen';
         d.vendors['bowl-lab']!.items[0]!.stock = 7;
     });
@@ -36,16 +39,18 @@ test('adding campus kitchens preserves existing orders and checkout retry record
     await db.close();
     await db.open();
     const migrated = db.read();
-    assert.equal(Object.keys(migrated.vendors).length, VENDOR_IDS.length);
-    assert.deepEqual(migrated.vendors['bowl-lab'], original.vendors['bowl-lab']);
-    assert.deepEqual(migrated.vendors['noodle-co'], original.vendors['noodle-co']);
+    assert.equal(Object.keys(migrated.vendors).length, VENDOR_IDS.length + 2);
+    for (const id of ['bowl-lab', 'noodle-co']) {
+        assert.deepEqual(migrated.vendors[id], { ...original.vendors[id],
+            vendor: { ...original.vendors[id]!.vendor, archived: true, open: false } });
+    }
     assert.deepEqual(migrated.checkouts, original.checkouts);
     assert.deepEqual(new CheckoutService(db).lookup(actor, 'migration-checkout'), order);
-    assert.deepEqual(JSON.parse(await readFile(path.join(db.directory, 'database.previous.json'), 'utf8')), original);
+    if (jsonFile) assert.deepEqual(JSON.parse(await readFile(path.join(db.directory, 'database.previous.json'), 'utf8')), original);
     await db.close();
     await db.open();
     assert.deepEqual(db.read(), migrated);
-    assert.equal((await new LocalStore(db).ids()).length, VENDOR_IDS.length);
+    assert.equal((await new LocalStore(db).ids()).length, VENDOR_IDS.length + 2);
 });
 
 test('catalogue migration preserves reviewed operator locations and photos', async t => {

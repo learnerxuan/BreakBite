@@ -1,10 +1,12 @@
 import test from 'node:test';
+import { addLegacyTestKitchens } from './fixtures.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { LocalDatabase, LocalStore } from '../src/server/local-database.js';
+import { LocalStore } from '../src/server/local-database.js';
+import { testDatabase } from './support/test-database.js';
 import { CheckoutService } from '../src/server/checkout.js';
 import { MealService } from '../src/server/domain.js';
 import { ProductService } from '../src/server/product.js';
@@ -22,7 +24,7 @@ const otherOp: Actor = { id:'operator-b', role:'vendor', vendorId:'noodle-co', n
 const code = (c:string) => (e:unknown) => e instanceof AppError && e.code===c;
 const food = (extra={}) => ({ingredients:'Rice, chicken, oil and soy sauce',allergensKnown:true,allergens:['soy'],mayContain:['sesame'],diets:[],spice:'mild',confirmed:true,...extra});
 async function setup(t:test.TestContext) {
-    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v3-'));const db=new LocalDatabase(dir);await db.open();
+    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v3-'));const db=testDatabase(dir);await db.open();await addLegacyTestKitchens(db);
     let now=Date.now();const clock=()=>now; const store=new LocalStore(db);const service=new MealService(store,clock,'pay_at_pickup');const checkout=new CheckoutService(db,clock);const product=new ProductService(db,clock);
     t.after(async()=>{await db.close();await rm(dir,{recursive:true,force:true});});
     const groups=[{vendorId:'bowl-lab',items:[{itemId:'chicken-rice',quantity:1}],slotId:db.read().vendors['bowl-lab']!.slots[3]!.id}];
@@ -127,6 +129,15 @@ test('vendor-late prepared cancellation does not restock consumed food or punish
     const f=await setup(t);const o=await f.order();await f.service.changeStatus(op,o.vendorId,o.id,{status:'preparing'});const stock=f.db.read().vendors['bowl-lab']!.items[0]!.stock;
     await f.service.reportIncident(op,o.vendorId,{reason:'Equipment issue',delayMinutes:20,itemIds:[]});await f.service.cancel(a,o.vendorId,o.id);
     const current=f.db.read().vendors['bowl-lab']!.orders[0]!;assert.equal(current.status,'cancelled');assert.equal(current.closedReason,'vendor_delay');assert.equal(f.db.read().vendors['bowl-lab']!.items[0]!.stock,stock);assert.ok(!current.noShowRecorded);
+});
+test('an unreported overdue preparation generates one delay notice even with no ready orders',async t=>{
+    const f=await setup(t);const o=await f.order();
+    f.setNow(Date.parse(o.promisedPickupEndAt!)+6*60000);
+    await f.product.tick();await f.product.tick();
+    assert.equal(f.db.read().vendors['bowl-lab']!.orders[0]!.vendorDelayed,true);
+    assert.equal(f.product.profile(a).notices.length,1);
+    assert.match(f.product.profile(a).notices[0]!.message,/delay/i);
+    assert.equal(f.product.profile(b).notices.length,0);
 });
 test('early ready does not expire before scheduled pickup; reminders are durable and deduplicated',async t=>{
     const f=await setup(t);const o=await f.order();await f.ready(o.id);const current=f.db.read().vendors['bowl-lab']!.orders[0]!;

@@ -1,7 +1,7 @@
 import { revokePush, pushDigest } from './push.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { accountActor, LocalDatabase, type LocalAccount, type LocalSession } from './local-database.js';
+import { accountActor, type Database, type LocalAccount, type LocalSession } from './local-database.js';
 import { object, requireThat, text } from './errors.js';
 import type { Actor } from '../shared/model.js';
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -11,7 +11,7 @@ const derive = (password: string, salt: string) => new Promise<Buffer>((resolve,
 function emailOf(value: unknown): string { const e = text(value, 'Email', 3, 254).toLowerCase(); requireThat(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e), 'INVALID_EMAIL', 'Enter a valid email address.'); return e; }
 function passwordOf(value: unknown): string { requireThat(typeof value === 'string' && value.length >= 10 && value.length <= 128, 'INVALID_PASSWORD', 'Use a password of 10–128 characters.'); return value; }
 export class Accounts {
-    constructor(private db: LocalDatabase, private secureCookie = false, private clock = Date.now) {}
+    constructor(private db: Database, private secureCookie = false, private clock = Date.now) {}
     async register(input: unknown): Promise<LocalAccount> {
         const b = object(input);
         requireThat(b.role === undefined && b.vendorId === undefined, 'INVALID_ROLE', 'Kitchen accounts are created by the operator administrator.', 403);

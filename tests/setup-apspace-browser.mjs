@@ -38,7 +38,7 @@ const provider = {
         };
     },
 };
-for (const id of ['bowl-lab', 'noodle-co']) {
+for (const id of ['asian-cuisine', 'bobanika']) {
     await service.openPickupWindows({ id: 'fixture', name: 'Fixture operator', role: 'vendor', vendorId: id }, id,
         { kitchenCapacity: 8, pickupCapacity: 4 });
 }

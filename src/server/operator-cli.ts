@@ -1,7 +1,7 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { settings } from './config.js';
-import { LocalDatabase } from './local-database.js';
+import { createDatabase, storageLabel } from './database-factory.js';
 import { Accounts } from './accounts.js';
 /** Password input is masked on a terminal; environment input is for local automation only. */
 async function secret(label: string): Promise<string> {
@@ -23,7 +23,8 @@ async function secret(label: string): Promise<string> {
 }
 const config = settings();
 if (config.mode !== 'local') throw new Error('Operator setup is for AUTH_MODE=local only.');
-const db = new LocalDatabase(config.dataDir); await db.open();
+const db = await createDatabase(config); await db.open();
+console.log('Storage:', storageLabel(config));
 try {
     const reset = process.argv.includes('--reset');
     const emailArg = process.argv.find(x => x.startsWith('--email='))?.slice(8);

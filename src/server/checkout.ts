@@ -3,7 +3,7 @@ import { foodCheck, isClosed, emptyProfile } from '../shared/features.js';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Actor, BasketGroup, BasketQuote, CheckoutResult, PublicOrder } from '../shared/model.js';
 import { MealService, parsePlan, parseSelections } from './domain.js';
-import { DraftStore, LocalDatabase, assertPickupItinerary } from './local-database.js';
+import { DraftStore, type Database, assertPickupItinerary } from './local-database.js';
 import { integer, object, requireThat, text } from './errors.js';
 
 function groupsFor(input: unknown, withSlots: boolean): BasketGroup[] {
@@ -26,7 +26,7 @@ function visible(o: PublicOrder): PublicOrder {
     return safe;
 }
 export class CheckoutService {
-    constructor(private db: LocalDatabase, private clock = Date.now) {}
+    constructor(private db: Database, private clock = Date.now) {}
     async quote(actor: Actor, input: unknown): Promise<BasketQuote> {
         requireThat(actor.role === 'student', 'FORBIDDEN', 'A student account is required.', 403);
         const b = object(input); const groups = groupsFor(b.groups, false);

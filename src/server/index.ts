@@ -4,14 +4,15 @@ import { ProductService } from './product.js';
 import { ApspaceTimetableProvider } from './apspace-timetable.js';
 import { settings } from './config.js';
 import { FileStore, FirestoreStore, type Store } from './store.js';
-import { LocalDatabase, LocalStore } from './local-database.js';
+import { LocalStore, type Database } from './local-database.js';
+import { createDatabase, storageLabel } from './database-factory.js';
 import { seedVendor, VENDOR_IDS } from './seed.js';
 import { MealService } from './domain.js';
 import { createApp } from './http.js';
 const config = settings();
-let store: Store; let db: LocalDatabase | undefined;
+let store: Store; let db: Database | undefined;
 if (config.mode === 'local') {
-    db = new LocalDatabase(config.dataDir); await db.open(); store = new LocalStore(db);
+    db = await createDatabase(config); await db.open(); store = new LocalStore(db);
 } else if (config.cloud) store = new FirestoreStore(config.projectId, [...VENDOR_IDS], config.accessToken);
 else {
     const local = new FileStore(config.dataDir); await local.load(); store = local;
@@ -29,7 +30,7 @@ async function refreshWindows(): Promise<void> {
         for (const id of await store.ids()) {
             const s = await store.read(id);
             if (s.vendor.open && !s.slots.some(w => Date.parse(w.startAt) > Date.now() + 165 * 60000))
-                await service.openPickupWindows({ id: 'scheduler', name: 'Pickup scheduler', role: 'vendor', vendorId: id }, id, { kitchenCapacity: s.vendor.onlineKitchenCapacity ?? 8, pickupCapacity: s.vendor.onlinePickupCapacity ?? 4 });
+                await service.openPickupWindows({ id: 'scheduler', name: 'Pickup scheduler', role: 'vendor', vendorId: id }, id, { kitchenCapacity: s.vendor.onlineKitchenCapacity ?? 8, pickupCapacity: s.vendor.onlinePickupCapacity ?? 4 }, true);
         }
     } finally { refreshing = false; }
 }
@@ -47,7 +48,10 @@ function refreshApspace(): void {
 const apspaceTimer = apspace ? setInterval(refreshApspace, 60000) : undefined;
 apspaceTimer?.unref();
 const server = createApp(config, service, db, push, product);
-server.listen(config.port, config.host, () => console.log(`BreakBite · http://${config.host}:${config.port} · ${config.mode === 'local' ? 'JSON accounts and orders; pay at each counter' : config.mode + ' adapter'}\nOperator setup: stop the server, then run npm run operator`));
+const operatorHint = config.store === 'firestore'
+    ? `Operator setup: npm run operator (this server picks it up within ${config.firestoreRefreshMs ? config.firestoreRefreshMs / 1000 + ' s' : 'a restart'})`
+    : 'Operator setup: stop the server, then run npm run operator';
+server.listen(config.port, config.host, () => console.log(`BreakBite · http://${config.host}:${config.port} · ${config.mode === 'local' ? `${storageLabel(config)}; pay at each counter` : config.mode + ' adapter'}\n${operatorHint}`));
 server.on('listening', refreshApspace);
 server.on('error', async error => { console.error('Could not start server:', error.message); clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer); clearInterval(apspaceTimer); await apspaceRefresh; await push?.settle(); await db?.close(); process.exitCode = 1; });
 let closing = false;

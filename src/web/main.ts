@@ -1,5 +1,6 @@
 import { pushAction, refreshPush, pushFingerprint, detachPush } from './push-client.js';
 import { foodCheck, emptyProfile, type StudentProfile, type Notice, type BookingLoad } from '../shared/features.js';
+import type { SavingsSummary } from '../shared/savings.js';
 import { productActions, stopCamera } from './product-actions.js';
 import { personalView, productDialogs, availabilityView } from './views/personal.js';
 import type { Actor, AppConfig, BasketGroup, BasketQuote, CheckoutResult, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
@@ -7,7 +8,7 @@ import { api, ApiError, restore, signIn, signOut } from './client.js';
 import { defaultBreakPlan, initialState } from './state.js';
 import { esc } from './ui.js';
 import { timetableActions } from './timetable-actions.js';
-import { explore, orders, checkoutDialog } from './views/student.js';
+import { explore, orders, checkoutDialog, mobileBasket } from './views/student.js';
 import { vendor, menuDialog } from './views/vendor.js';
 const root=document.querySelector<HTMLDivElement>('#app')!;
 const s=initialState();
@@ -19,6 +20,19 @@ const checkoutCacheFor = (actorId: string) => `${checkoutCache}:${actorId}`;
 type CheckoutAttempt = { key: string; serialized: string; actorId: string; storageKey: string };
 let attempt: CheckoutAttempt | null = null;
 let actorGeneration = 0;
+let basketReturnFocus = 'mobile-basket-button';
+let basketScrollTop = 0;
+
+function closeBasket(): void {
+    s.mobileBasketOpen = false;
+    render();
+    document.getElementById(basketReturnFocus)?.focus({ preventScroll: true });
+}
+function returnToBasket(): void {
+    s.quote = null; s.checkoutError = '';
+    s.mobileBasketOpen = mobileBasket();
+    render();
+}
 
 function restoreAttempt(actor: Actor | null): CheckoutAttempt | null {
     if (actor?.role !== 'student') return null;
@@ -50,7 +64,9 @@ function invalidate(): void { s.quote=null;s.chosen={};s.checkoutError='';clearA
 const timetable = timetableActions(s, render, invalidate, notify);
 function navigate(view: typeof s.view): void {
     if (view !== 'explore' && s.timetable.loading) timetable.cancelPreview();
+    if (view !== s.view) window.scrollTo({top:0});
     s.view = view;
+    if (view !== 'explore') s.mobileBasketOpen = false;
 }
 function setActor(actor: Actor | null): void {
     if (s.actor?.id !== actor?.id || s.actor?.role !== actor?.role) {
@@ -62,8 +78,11 @@ function setActor(actor: Actor | null): void {
         delete s.apspaceFeedback;
         delete s.apspaceReview;
         s.fitBreak = false; s.plan = defaultBreakPlan(); s.planDraft = {}; s.manualPlan = false;
+        s.mobileBasketOpen = false; basketScrollTop = 0;
         s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
         s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
+        s.savings = { minutes: 0, checkouts: 0 };
+        s.history = {search:'',status:'all',date:''};
     }
     s.actor = actor;
 }
@@ -80,12 +99,13 @@ async function refresh(): Promise<void> {
             const loads = await api<BookingLoad[]>('/api/product/loads');
             if (generation !== actorGeneration) return;
             if (snapshot.actor.role === 'student') {
-                const p = await api<{profile:StudentProfile;notices:Notice[]}>('/api/product/profile');
+                const p = await api<{profile:StudentProfile;notices:Notice[];savings:SavingsSummary}>('/api/product/profile');
                 if (generation !== actorGeneration) return;
                 const fresh = p.notices.filter(n => !n.readAt && !noticeIds.has(n.id));
                 if (noticesInitialised && fresh.length) notify(fresh[0]!.message);
                 noticesInitialised = true;
                 noticeIds = new Set(p.notices.map(n => n.id)); s.profile = p.profile; s.notices = p.notices;
+                s.savings = p.savings ?? { minutes: 0, checkouts: 0 };
                 timetable.clearStaleSavedBreak();
             }
             s.snapshot = snapshot; s.vendors = snapshot.vendors; s.items = snapshot.items; s.loads = loads;
@@ -99,7 +119,17 @@ async function refresh(): Promise<void> {
         }
     }
     else {const c=await api<{vendors:Vendor[];items:MenuItem[];loads:BookingLoad[]}>('/api/catalog');if(generation!==actorGeneration)return;s.vendors=c.vendors;s.items=c.items;s.loads=c.loads;}
+    if (!attempt && !s.uncertain) {
+        const availableKitchenIds = new Set(s.vendors.filter(vendor => !vendor.archived).map(vendor => vendor.id));
+        const current = s.cart.filter(line => availableKitchenIds.has(line.vendorId));
+        if (current.length !== s.cart.length) {
+            s.cart = current;
+            s.basketMessages = [...s.basketMessages, 'Items from retired kitchens were removed from your basket. Existing orders are unchanged.'];
+            invalidate();
+        }
+    }
     if(s.view==='inbox') await refreshPush(s.actor);
+    if(s.vendorFilter!=='all'&&!s.vendors.some(v=>v.id===s.vendorFilter&&v.open&&!v.archived))s.vendorFilter='all';
     s.offline=false;
 }
 function authDialog(): string {
@@ -110,7 +140,9 @@ function authDialog(): string {
 function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
-    const planDetailsOpen = root.querySelector<HTMLDetailsElement>('#plan-form details')?.open;
+    const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
+    if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
+    if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
     const student=s.actor?.role!=='vendor';
     const surface=s.actor?.role==='vendor'?`vendor-${s.vendorTab}`:s.view;
     root.innerHTML=`<a class="bb-skip-link" href="#main">Skip to main content</a><header class="bb-header ${student?'student':'vendor'}"><a href="/" class="bb-brand" aria-label="BreakBite home"><img src="/favicon.svg" alt="">BreakBite<i>.</i></a><nav aria-label="Main navigation">${student?`<button data-view="explore" class="${s.view==='explore'?'active':''}" ${s.view==='explore'?'aria-current="page"':''}>Explore</button><button data-view="availability" class="${s.view==='availability'?'active':''}" ${s.view==='availability'?'aria-current="page"':''}>Availability</button>${s.actor?`<button data-view="orders" class="${s.view==='orders'?'active':''}" ${s.view==='orders'?'aria-current="page"':''}>My orders</button><button data-view="saved" class="${s.view==='saved'?'active':''}" ${s.view==='saved'?'aria-current="page"':''}>Saved</button><button data-view="planner" class="${s.view==='planner'?'active':''}" ${s.view==='planner'?'aria-current="page"':''}>My planner</button><button data-view="inbox" class="${s.view==='inbox'?'active':''}" ${s.view==='inbox'?'aria-current="page"':''}>Inbox${s.notices.filter(n=>!n.readAt).length?` (${s.notices.filter(n=>!n.readAt).length})`:''}</button>`:''}`:'<span class="bb-workspace-label">Kitchen workspace</span>'}</nav><div class="bb-header-right">${s.actor?`<span class="bb-user">${esc(s.actor.name)}</span><button class="bb-button secondary" data-action="logout">Sign out</button>`:'<button class="bb-button primary" data-action="login">Sign in</button>'}</div></header>
@@ -121,14 +153,13 @@ function render(): void {
     const selected = nav?.querySelector<HTMLElement>('button.active');
     if(nav && selected){const n=nav.getBoundingClientRect(),b=selected.getBoundingClientRect();if(b.left<n.left)nav.scrollLeft-=n.left-b.left;else if(b.right>n.right)nav.scrollLeft+=b.right-n.right;}
     for(const dialog of root.querySelectorAll<HTMLDialogElement>('dialog')) {
-        dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
+        dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){if(dialog.id==='mobile-basket-dialog'){closeBasket();return;}if(dialog.id==='checkout-dialog'){returnToBasket();return;}stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
     }
     root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>{if(s.busy)b.disabled=true;});
-    if (planDetailsOpen) {
-        const details = root.querySelector<HTMLDetailsElement>('#plan-form details');
-        if (details) details.open = true;
-    }
-    if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
+    const modal = root.querySelector('dialog[open]');
+    if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el && (!modal || modal.contains(el))){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
+    const scrollAfter = root.querySelector<HTMLElement>('.bb-basket-scroll');
+    if (scrollAfter && s.mobileBasketOpen) scrollAfter.scrollTop = basketScrollTop;
 }
 async function work(fn: ()=>Promise<void>): Promise<void> {
     if(s.busy)return;s.busy=true;
@@ -235,11 +266,23 @@ root.addEventListener('click',event=>{
     }
     if(action==='login'){s.auth='login';s.authError='';render();return;}
     if(action==='switch-auth'){s.auth=s.auth==='login'?'register':'login';s.authError='';render();return;}
+    if(action==='clear-history'){s.history={search:'',status:'all',date:''};render();return;}
     if(action==='close-auth'){s.auth=null;s.authError='';render();return;}
-    if(action==='close-checkout'){s.quote=null;s.checkoutError='';render();return;}
+    if(action==='close-checkout'){returnToBasket();return;}
     if(action==='close-editor'){s.editing=null;render();return;}
     if(action==='clear-allergen-filters'){s.allergenFilters=[];render();return;}
-    if(action==='show-basket'){document.getElementById('basket')?.scrollIntoView({behavior:'smooth'});document.getElementById('basket')?.focus({preventScroll:true});return;}
+    if(action==='close-basket'){closeBasket();return;}
+    if(action==='show-basket'||action==='open-break-plan'){
+        if(action==='open-break-plan'){
+            if(s.uncertain)return;
+            if(!s.fitBreak){s.fitBreak=true;invalidate();}
+        }
+        if(mobileBasket()){
+            basketReturnFocus=target.id || 'mobile-basket-button';s.mobileBasketOpen=true;render();
+            if(action==='open-break-plan') document.getElementById('fit-toggle')?.scrollIntoView({block:'start'});
+        }else{render();document.getElementById('basket')?.scrollIntoView({behavior:'smooth'});document.getElementById('basket')?.focus({preventScroll:true});}
+        return;
+    }
     if(action==='new-item'){s.editing='new';render();return;}
     if(action==='edit-item'){s.editing=s.items.find(i=>i.id===id&&i.vendorId===vid)??null;render();return;}
     if(action==='add'||action==='plus'||action==='minus'){
@@ -272,7 +315,7 @@ root.addEventListener('click',event=>{
             await api(vendorPath(`orders/${encodeURIComponent(id)}/cancel`,vid),'POST',{});await refresh();notify('Kitchen order cancelled. No online payment was taken.');
         }
         else if(action==='status'){await api(vendorPath(`orders/${encodeURIComponent(id)}/status`),'POST',{status:target.dataset.status});await refresh();}
-        else if(action==='toggle-open'){const v=s.vendors.find(v=>v.id===vid)!;await api(vendorPath('open'),'PATCH',{open:!v.open});await refresh();}
+        else if(action==='toggle-open'){const v=s.vendors.find(v=>v.id===vid)!;await api(vendorPath('open'),'PATCH',{open:!v.open});await refresh();notify(v.open?'Kitchen closed. Food is hidden from student menus; existing orders remain active.':'Kitchen reopened. Food is visible on student menus.');}
         else if(action==='toggle-item'){const i=s.items.find(i=>i.id===id&&i.vendorId===vid)!;await api(vendorPath(`items/${encodeURIComponent(id)}`),'PATCH',{enabled:!i.enabled});await refresh();}
         else if(action==='resolve'){await api(vendorPath(`incidents/${encodeURIComponent(id)}/resolve`),'POST',{});s.recovery={};await refresh();}
         else if(action==='evaluate'){s.recovery[id]=await api<{options:RecoveryOption[];message:string}>(vendorPath('recovery/evaluate'),'POST',{orderId:id});}
@@ -299,6 +342,7 @@ root.addEventListener('input', event => {
 });
 root.addEventListener('submit',event=>{
     event.preventDefault();const form=event.target as HTMLFormElement;const f=new FormData(form);if(extra.submit(form))return;
+    if(form.id==='history-form'){s.history={search:String(f.get('historySearch')??'').trim(),status:String(f.get('historyStatus')??'all'),date:String(f.get('historyDate')??'')};render();return;}
     if(form.id==='search-form'){s.search=String(f.get('search')??'');render();return;}
     if(form.id==='plan-form'){
         if(s.busy||s.uncertain)return;
@@ -337,16 +381,16 @@ root.addEventListener('submit',event=>{
 async function boot(): Promise<void> {
     try {
         s.config=await api<AppConfig>('/api/config');
-        if(s.config.mode!=='local')throw new Error('This release uses AUTH_MODE=local and JSON storage. Cloud and Enterprise migration is deferred; see docs/LOCAL_MVP.md.');
+        if(s.config.mode!=='local')throw new Error('Use AUTH_MODE=local for this product UI. Configure file or Firestore storage separately; see docs/FIRESTORE.md.');
         setActor(await restore());if(s.actor?.role==='vendor')s.view='vendor';else if(new URLSearchParams(location.search).get('view')==='inbox'){s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';}await refresh();await refreshPush(s.actor);
         if(attempt&&attempt.actorId===s.actor?.id){const prior=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(attempt.key)}`);if(prior.checkout){confirmed(prior.checkout);await refresh();}else s.uncertain=true;}
         render();
         setInterval(()=>{if(refreshing||s.busy||s.scanner)return;refreshing=true;
             const generation=actorGeneration;
-            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
+            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,savings:s.savings,checkoutError:s.checkoutError});
             void refresh().then(()=>{
                 if(generation!==actorGeneration){if(!s.busy)render();return;}
-                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
+                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,savings:s.savings,checkoutError:s.checkoutError});
                 const active=document.activeElement;
                 const editing=['INPUT','TEXTAREA','SELECT'].includes(active?.tagName??'')||Boolean(active?.closest('.bb-timetable, #plan-form'));
                 if(before!==after&&!editing&&!s.busy&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();
@@ -360,4 +404,5 @@ async function boot(): Promise<void> {
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
     if(event.data?.type==='OPEN_INBOX'){if(s.actor?.role==='vendor')return;navigate(s.actor?'inbox':'explore');if(!s.actor)s.auth='login';void refreshPush(s.actor).then(()=>render());render();}
 });
+matchMedia('(max-width: 860px)').addEventListener('change', () => { if (!s.busy) render(); });
 void boot();

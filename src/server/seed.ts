@@ -2,7 +2,9 @@ import type { Allergen, Diet, FoodInfo, Spice } from '../shared/features.js';
 import type { Actor, MenuItem, VendorState } from '../shared/model.js';
 
 /** Supplied campus photos and demo menu data. Operators must review before serving. */
-export const VENDOR_IDS = ['bowl-lab', 'noodle-co', 'asian-cuisine', 'bobanika', 'chinese-kitchen', 'japanese-kitchen', 'korean-kitchen', 'lets-kopitiam', 'nelson', 'subway', 'western-kitchen'] as const;
+export const VENDOR_IDS = ['asian-cuisine', 'bobanika', 'chinese-kitchen', 'japanese-kitchen', 'korean-kitchen', 'lets-kopitiam', 'nelson', 'subway', 'western-kitchen'] as const;
+export const LEGACY_VENDOR_IDS = ['bowl-lab', 'noodle-co'] as const;
+export const ALL_VENDOR_IDS = [...VENDOR_IDS, ...LEGACY_VENDOR_IDS] as const;
 
 export const DEMO_IDENTITIES: Actor[] = [
     { id: 'student-alex', role: 'student', name: 'Alex · student' },
