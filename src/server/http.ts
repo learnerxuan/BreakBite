@@ -8,7 +8,7 @@ import type { Settings } from './config.js';
 import { Auth } from './auth.js';
 import { Accounts } from './accounts.js';
 import { CheckoutService } from './checkout.js';
-import type { LocalDatabase } from './local-database.js';
+import type { Database } from './local-database.js';
 import { AppError, object, requireThat } from './errors.js';
 import { MealService } from './domain.js';
 import { DEMO_IDENTITIES, seedVendor } from './seed.js';
@@ -33,7 +33,7 @@ async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
         throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.');
     }
 }
-export function createApp(config: Settings, service: MealService, db?: LocalDatabase, notificationService?: PushService, productService?: ProductService) {
+export function createApp(config: Settings, service: MealService, db?: Database, notificationService?: PushService, productService?: ProductService) {
     const auth = new Auth(config);
     const push = notificationService ?? (db ? new PushService(db) : undefined);
     const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
@@ -92,6 +92,8 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 limits.set(key, limit);
             }
             requireThat(++limit.count <= 300, 'RATE_LIMIT', 'Too many requests. Retry shortly.', 429);
+            // Firestore: another process (e.g. the operator CLI) may have written since the last check.
+            if (pathname.startsWith('/api/')) await db?.refresh();
             if (pathname === '/mcp') {
                 requireThat(req.method === 'POST', 'METHOD_NOT_ALLOWED', 'This stateless MCP endpoint accepts POST only.', 405);
                 const actor = await auth.agent(req);

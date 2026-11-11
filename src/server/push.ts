@@ -3,7 +3,7 @@ import type { Actor } from '../shared/model.js';
 import type { Notice } from '../shared/features.js';
 import { isClosed } from '../shared/features.js';
 import type { PushKeys, PushStatus } from '../shared/push.js';
-import { LocalDatabase, type LocalData } from './local-database.js';
+import type { Database, LocalData } from './local-database.js';
 import { object, requireThat, text } from './errors.js';
 import { subscriptionOf, transport, type PushTransport } from './web-push.js';
 const minute = 60000, day = 86400000;
@@ -36,7 +36,7 @@ function applicable(d: LocalData, n: Notice, now: number): boolean {
 export class PushService {
     private running: Promise<void> | null = null;
     private send: PushTransport;
-    constructor(readonly db: LocalDatabase, private keys?: PushKeys, send?: PushTransport, private clock = Date.now) {
+    constructor(readonly db: Database, private keys?: PushKeys, send?: PushTransport, private clock = Date.now) {
         this.send = send ?? (keys ? transport(keys) : async () => ({ status: 503 }));
     }
     publicConfig() { return { configured: !!this.keys, publicKey: this.keys?.publicKey ?? '' }; }

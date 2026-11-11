@@ -3,7 +3,8 @@ import test from 'node:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { LocalDatabase, LocalStore } from '../src/server/local-database.js';
+import { LocalStore } from '../src/server/local-database.js';
+import { jsonFile, testDatabase } from './support/test-database.js';
 import { CheckoutService } from '../src/server/checkout.js';
 import { VENDOR_IDS, seedVendor } from '../src/server/seed.js';
 import { foodCheck } from '../src/shared/features.js';
@@ -12,7 +13,7 @@ import { basket, explore } from '../src/web/views/student.js';
 
 async function fixture(t: test.TestContext) {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'breakbite-campus-'));
-    const db = new LocalDatabase(directory);
+    const db = testDatabase(directory);
     await db.open();
     t.after(async () => { await db.close(); await rm(directory, { recursive: true, force: true }); });
     return db;
@@ -41,7 +42,7 @@ test('adding campus kitchens preserves existing orders and checkout retry record
     assert.deepEqual(migrated.vendors['noodle-co'], original.vendors['noodle-co']);
     assert.deepEqual(migrated.checkouts, original.checkouts);
     assert.deepEqual(new CheckoutService(db).lookup(actor, 'migration-checkout'), order);
-    assert.deepEqual(JSON.parse(await readFile(path.join(db.directory, 'database.previous.json'), 'utf8')), original);
+    if (jsonFile) assert.deepEqual(JSON.parse(await readFile(path.join(db.directory, 'database.previous.json'), 'utf8')), original);
     await db.close();
     await db.open();
     assert.deepEqual(db.read(), migrated);

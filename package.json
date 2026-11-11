@@ -14,6 +14,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test dist-tests/tests/*.test.js",
     "check": "npm run typecheck && npm test && npm run build",
+    "test:firestore-live": "tsc -p tsconfig.test.json && node --env-file-if-exists=.env --test dist-tests/tests/firestore-live.test.js",
+    "test:firestore-memory": "tsc -p tsconfig.test.json && node scripts/test-store.mjs firestore-memory",
+    "test:firestore-suite": "tsc -p tsconfig.test.json && node --env-file-if-exists=.env scripts/test-store.mjs firestore",
     "seed:cloud": "node --env-file-if-exists=.env dist/server/seed-cloud.js",
     "operator": "node --env-file-if-exists=.env dist/server/operator-cli.js",
     "push:keys": "node --env-file-if-exists=.env scripts/push-keys.mjs"
@@ -21,5 +24,8 @@
   "devDependencies": {
     "@types/node": "25.1.0",
     "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "firebase-admin": "13.10.0"
   }
 }

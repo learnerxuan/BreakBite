@@ -8,7 +8,8 @@ import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
-import { LocalDatabase, LocalStore, accountActor } from '../src/server/local-database.js';
+import { LocalStore, accountActor } from '../src/server/local-database.js';
+import { testDatabase } from './support/test-database.js';
 import { Accounts } from '../src/server/accounts.js';
 import { CheckoutService } from '../src/server/checkout.js';
 import { MealService } from '../src/server/domain.js';
@@ -38,7 +39,7 @@ const op: Actor = { id:'op',name:'Kitchen',role:'vendor',vendorId:'bowl-lab' };
 const rejected = (code:string)=>(e:unknown)=>e instanceof AppError && e.code===code;
 function subscription(suffix='device') { const e=createECDH('prime256v1');e.generateKeys();return { endpoint:`https://fcm.googleapis.com/fcm/send/${suffix}`,keys:{p256dh:e.getPublicKey().toString('base64url'),auth:Buffer.alloc(16,23).toString('base64url')},privateKey:e.getPrivateKey() }; }
 async function fixture(t:test.TestContext) {
-    const dir=await mkdtemp(path.join(os.tmpdir(),'bb-push-'));const db=new LocalDatabase(dir);await db.open();
+    const dir=await mkdtemp(path.join(os.tmpdir(),'bb-push-'));const db=testDatabase(dir);await db.open();
     let now=Date.now();const clock=()=>now;const accountService=new Accounts(db,false,clock);
     const account=await accountService.register({name:'Push Student',email:'push@example.test',password:'Fixture-long-password'});const actor=accountActor(account);
     const keys=generatePushKeys('mailto:operator@example.test');const sent:{payload:string;endpoint:string;ttl:number}[]=[];

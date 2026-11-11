@@ -7,6 +7,7 @@
 
 - Native TypeScript/CSS browser modules and Node HTTP backend.
 - `AUTH_MODE=local`, `STORE=file`; cookie-authenticated accounts and persistent JSON.
+- Optional `STORE=firestore`: the same `LocalData` in Cloud Firestore through `firebase-admin`, one document per record, one atomic commit per change and a ROOT updateTime precondition for cross-process safety. See [FIRESTORE.md](FIRESTORE.md).
 - A single locked database stores all kitchens. A checkout validates all children and writes one atomic file replacement, or commits nothing.
 - Legacy cloud/MCP adapters remain migration code. The product UI deliberately requires local mode until cloud multi-kitchen transactions are implemented and tested.
 

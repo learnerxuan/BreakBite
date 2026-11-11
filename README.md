@@ -6,7 +6,7 @@
 - **For APU students:** an independent student project, not an official campus service.
 - Browse before arriving, order from multiple kitchens, choose realistic pickup windows and collect separately.
 - Ordinary ordering works without a timetable. **Fit my break** is optional.
-- Google Cloud/Firebase migration and actual Gemini Enterprise integration remain deferred.
+- Optional Firestore storage (`STORE=firestore`) is implemented and tested against a real database; hosting it publicly and Gemini Enterprise integration remain deferred.
 
 ## Run
 
@@ -79,6 +79,7 @@ npm start
 - `.data/media/`: uploaded raster photographs; include this directory in private backups.
 - Single-process lock, serialized draft transaction, flushed temporary file and atomic rename protect multi-kitchen writes.
 - Previous JSON snapshot is retained; it is not a complete backup strategy. No multiple replicas/shared filesystem.
+- **Firestore option:** `STORE=firestore` keeps the same data in Cloud Firestore, with one atomic, conflict-checked commit per change, so several server processes can share it. See [Firestore storage](docs/FIRESTORE.md).
 - Salted scrypt passwords, hashed opaque sessions, HttpOnly cookies, CSRF protection, server-side role/ownership checks and rate limits.
 - The optional v0.3 fields migrate in place; existing accounts/orders remain. Legacy ready orders without a timestamp receive a fresh grace period when first observed.
 - Email verification/reset delivery, distributed abuse protection, independent security audit and campus-scale performance are not completed.
@@ -99,13 +100,15 @@ src/web/views/             Student, kitchen and personal pages
 src/web/product-actions.ts  Camera, photo, saved meal and timetable interactions
 ```
 
-TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm dependencies.
+TypeScript/native browser modules + CSS + Node.js; **not React**. One runtime npm dependency, `firebase-admin`, loaded only when `STORE=firestore`.
 
 ## Verification and guides
 
-- `npm run check`: type checking, **160 automated tests**, production build.
+- `npm run check`: type checking, **177 automated tests** (one opt-in live Firestore test is skipped by default), production build.
+- `npm run test:firestore-memory` / `test:firestore-suite`: the same suite on an in-memory Firestore stand-in or a real Firestore database. See [Firestore storage](docs/FIRESTORE.md#tests).
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
+- [Firestore storage](docs/FIRESTORE.md)
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)
 - [v0.3 features and review guide](docs/RELEASE_0_3.md)
 - [Test results and limitations](docs/TEST_REPORT.md)
