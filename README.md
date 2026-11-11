@@ -6,11 +6,11 @@
 - **For APU students:** an independent student project, not an official campus service.
 - Browse before arriving, order from multiple kitchens, choose realistic pickup windows and collect separately.
 - Ordinary ordering works without a timetable. **Fit my break** is optional.
-- Optional Firestore storage (`STORE=firestore`) is implemented; this integration was checked with the official emulator. Live-project credentials/rules, public hosting and Gemini Enterprise integration remain separate validation.
+- Optional Firestore storage (`STORE=firestore`) and Vercel deployment configuration are implemented and checked locally. Live-project credentials/rules, actual hosted deployment and Gemini Enterprise integration remain separate validation.
 
 ## Run
 
-Requires **Node.js 22.16+**.
+Requires **Node.js 22.16+ in the 22.x release line**.
 
 ```bash
 npm install
@@ -109,15 +109,16 @@ src/web/views/             Student, kitchen and personal pages
 src/web/product-actions.ts  Camera, photo, saved meal and timetable interactions
 ```
 
-TypeScript/native browser modules + CSS + Node.js; **not React**. One runtime npm dependency, `firebase-admin`, loaded only when `STORE=firestore`.
+TypeScript/native browser modules + CSS + Node.js; **not React**. Firebase Admin is loaded for Firestore; Vercel Blob is loaded for hosted photo uploads.
 
 ## Verification and guides
 
-- `npm run check`: type checking, **202 automated tests** (201 pass; one opt-in live Firestore test is skipped by default), production build.
+- `npm run check`: type checking, **212 automated tests** (211 pass; one opt-in live Firestore test is skipped by default), production build.
 - `npm run test:firestore-memory` / `test:firestore-suite`: the same suite on an in-memory Firestore stand-in or a real Firestore database. See [Firestore storage](docs/FIRESTORE.md#tests).
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
 - [Firestore storage](docs/FIRESTORE.md)
+- [Vercel deployment and hosted acceptance](docs/VERCEL.md)
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)
 - [v0.3 features and review guide](docs/RELEASE_0_3.md)
 - [Test results and limitations](docs/TEST_REPORT.md)

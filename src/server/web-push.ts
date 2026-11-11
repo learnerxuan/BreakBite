@@ -50,8 +50,13 @@ export function generatePushKeys(subject: string): PushKeys {
     scalar.copy(privateKey, privateKey.length - scalar.length);
     return validatePushKeys({ publicKey: e.getPublicKey().toString('base64url'), privateKey: privateKey.toString('base64url'), subject });
 }
-export async function loadPushKeys(directory: string, enabled = process.env.PUSH_ENABLED === 'true'): Promise<PushKeys | undefined> {
+export async function loadPushKeys(directory: string, enabled = process.env.PUSH_ENABLED === 'true', inline = process.env.WEB_PUSH_KEYS_JSON): Promise<PushKeys | undefined> {
     if (!enabled) return undefined;
+    if (inline) {
+        let value: unknown;
+        try { value = JSON.parse(inline); } catch { throw new Error('WEB_PUSH_KEYS_JSON must contain valid VAPID key JSON.'); }
+        return validatePushKeys(value);
+    }
     const content = await readFile(path.join(directory, 'web-push-keys.json'), 'utf8').catch(() => { throw new Error('Push enabled but keys are missing. Run npm run push:keys -- --subject=mailto:YOUR_EMAIL first.'); });
     return validatePushKeys(JSON.parse(content));
 }

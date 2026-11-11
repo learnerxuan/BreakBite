@@ -244,7 +244,7 @@ export class MealService {
         });
         requireThat(result, 'INVALID_CODE', 'Incorrect pickup code.', 400);
     }
-    async openPickupWindows(actor: Actor, vendorId: string, input: unknown): Promise<{
+    async openPickupWindows(actor: Actor, vendorId: string, input: unknown, scheduler = false): Promise<{
         added: number;
     }> {
         operator(actor, vendorId);
@@ -252,12 +252,19 @@ export class MealService {
         const kitchenCapacity = integer(b.kitchenCapacity, 'Online kitchen workload', 1, 100);
         const pickupCapacity = integer(b.pickupCapacity, 'Online handovers', 1, 50);
         return this.store.transact(vendorId, s => {
-            s.vendor.onlineKitchenCapacity = kitchenCapacity;
-            s.vendor.onlinePickupCapacity = pickupCapacity;
+            // Recheck inside the atomic transaction: another instance may have refreshed
+            // windows or the operator may have closed/updated the kitchen meanwhile.
+            if (scheduler) {
+                if (!s.vendor.open || s.vendor.archived || s.slots.some(w => Date.parse(w.startAt) > this.clock() + 165 * MINUTE)) return { added: 0 };
+            }
+            const effectiveKitchen = scheduler ? s.vendor.onlineKitchenCapacity ?? 8 : kitchenCapacity;
+            const effectivePickup = scheduler ? s.vendor.onlinePickupCapacity ?? 4 : pickupCapacity;
+            s.vendor.onlineKitchenCapacity = effectiveKitchen;
+            s.vendor.onlinePickupCapacity = effectivePickup;
             const ids = new Set(s.slots.map(x => x.id));
             const fresh = seedVendor(vendorId, this.clock()).slots.filter(x => !ids.has(x.id));
             for (const slot of fresh)
-                s.slots.push({ ...slot, kitchenCapacity, pickupCapacity });
+                s.slots.push({ ...slot, kitchenCapacity: effectiveKitchen, pickupCapacity: effectivePickup });
             // Preserve every slot referenced by an order, including historical orders.
             const referenced = new Set(s.orders.map(o => o.slotId));
             s.slots = s.slots.filter(x => Date.parse(x.endAt) >= this.clock() || referenced.has(x.id));

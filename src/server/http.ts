@@ -13,12 +13,28 @@ import { AppError, object, requireThat } from './errors.js';
 import { MealService } from './domain.js';
 import { DEMO_IDENTITIES, seedVendor } from './seed.js';
 import { PROTOCOLS, rpc } from './mcp.js';
+import { clientAddress } from './client-address.js';
+import { fileMedia, mediaType, type MediaStore } from './media-store.js';
+import { createHash, timingSafeEqual } from 'node:crypto';
+export interface HttpHooks { maintenance?: (force?: boolean) => Promise<void>; maintenanceSecret?: string; media?: MediaStore }
 function json(res: ServerResponse, status: number, value: unknown): void {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(value));
 }
 async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
     requireThat(req.headers['content-type']?.split(';')[0] === 'application/json', 'CONTENT_TYPE', 'Use application/json.', 415);
+    const declared = req.headers['content-length'];
+    if (declared !== undefined) requireThat(typeof declared === 'string' && /^\d+$/.test(declared) && Number(declared) <= limit, 'BODY_TOO_LARGE', 'Request exceeds the allowed size.', 413);
+    // Vercel's Node helpers consume the stream and expose a lazy parsed body.
+    // Local Node and helpers-disabled deployments retain the bounded stream path.
+    if ('body' in req) {
+        let parsed: unknown;
+        try { parsed = req.body; } catch { throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.'); }
+        const encoded = JSON.stringify(parsed);
+        requireThat(encoded !== undefined, 'INVALID_JSON', 'Malformed JSON.');
+        requireThat(Buffer.byteLength(encoded) <= limit, 'BODY_TOO_LARGE', 'Request exceeds the allowed size.', 413);
+        return parsed;
+    }
     let size = 0;
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
@@ -33,7 +49,7 @@ async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
         throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.');
     }
 }
-export function createApp(config: Settings, service: MealService, db?: Database, notificationService?: PushService, productService?: ProductService) {
+export function createHandler(config: Settings, service: MealService, db?: Database, notificationService?: PushService, productService?: ProductService, hooks: HttpHooks = {}) {
     const auth = new Auth(config);
     const push = notificationService ?? (db ? new PushService(db) : undefined);
     const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
@@ -45,7 +61,7 @@ export function createApp(config: Settings, service: MealService, db?: Database,
         until: number;
     }>();
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-    return createServer(async (req, res) => {
+    return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Referrer-Policy', 'same-origin');
         res.setHeader('X-Frame-Options', 'DENY');
@@ -74,8 +90,8 @@ export function createApp(config: Settings, service: MealService, db?: Database,
                 return;
             }
             if (db && /^\/media\/[a-f0-9]{64}\.(png|jpg|webp)$/.test(pathname) && req.method === 'GET') {
-                const bytes = await readFile(path.join(db.directory, 'media', path.basename(pathname))).catch(() => { throw new AppError(404, 'NOT_FOUND', 'Photo not found.'); });
-                res.writeHead(200, { 'Content-Type': pathname.endsWith('.png') ? 'image/png' : pathname.endsWith('.webp') ? 'image/webp' : 'image/jpeg', 'Cache-Control': 'public,max-age=86400' }); res.end(bytes); return;
+                const bytes = await (hooks.media ?? fileMedia(db.directory)).get(path.basename(pathname));
+                res.writeHead(200, { 'Content-Type': mediaType(pathname), 'Cache-Control': 'public,max-age=86400' }); res.end(bytes); return;
             }
             if (pathname === '/healthz') {
                 json(res, 200, { ok: true, version: '0.3.1', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
@@ -83,7 +99,7 @@ export function createApp(config: Settings, service: MealService, db?: Database,
             }
             // Catalogue images/modules must not spend the allowance reserved for API work.
             if (pathname.startsWith('/api/') || pathname === '/mcp') {
-                const key = req.socket.remoteAddress ?? 'unknown';
+                const key = clientAddress(req, config.vercel);
                 if (limits.size > 5000)
                     for (const [id, limit] of limits)
                         if (limit.until < Date.now()) limits.delete(id);
@@ -96,6 +112,12 @@ export function createApp(config: Settings, service: MealService, db?: Database,
             }
             // Refresh cached Firestore state before authenticated API work.
             if (pathname.startsWith('/api/')) await db?.refresh();
+            if (pathname === '/api/internal/maintenance') {
+                const digest = (value: string) => createHash('sha256').update(value).digest();
+                requireThat(req.method === 'GET' && hooks.maintenance && hooks.maintenanceSecret && timingSafeEqual(digest(req.headers.authorization ?? ''), digest(`Bearer ${hooks.maintenanceSecret}`)), 'FORBIDDEN', 'Maintenance access denied.', 403);
+                await hooks.maintenance(true); json(res, 200, { ok: true }); return;
+            }
+            if (pathname.startsWith('/api/')) await hooks.maintenance?.();
             if (pathname === '/mcp') {
                 requireThat(req.method === 'POST', 'METHOD_NOT_ALLOWED', 'This stateless MCP endpoint accepts POST only.', 405);
                 const actor = await auth.agent(req);
@@ -123,7 +145,7 @@ export function createApp(config: Settings, service: MealService, db?: Database,
                 return;
             }
             if (accounts && ['/api/auth/login', '/api/auth/register'].includes(pathname) && req.method === 'POST') {
-                const id = req.socket.remoteAddress ?? 'unknown';
+                const id = clientAddress(req, config.vercel);
                 if (authLimits.size > 5000) for (const [k, v] of authLimits) if (v.until <= Date.now()) authLimits.delete(k);
                 let entry = authLimits.get(id);
                 if (!entry || entry.until <= Date.now()) { entry = { count: 0, until: Date.now() + 60000 }; authLimits.set(id, entry); }
@@ -300,5 +322,8 @@ export function createApp(config: Settings, service: MealService, db?: Database,
             else
                 res.end();
         }
-    });
+    };
+}
+export function createApp(config: Settings, service: MealService, db?: Database, notificationService?: PushService, productService?: ProductService, hooks: HttpHooks = {}) {
+    return createServer(createHandler(config, service, db, notificationService, productService, hooks));
 }

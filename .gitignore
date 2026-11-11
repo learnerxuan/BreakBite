@@ -4,6 +4,7 @@ dist-tests/
 .data/
 .data-*/
 .arc/
+.vercel/
 .env
 .env.*
 !.env.example

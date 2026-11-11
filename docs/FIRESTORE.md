@@ -83,7 +83,7 @@ None of them touch `envs/production`. Four tests include JSON-file behaviour. On
 - **Whole dataset in memory** per server process, as with the JSON file.
 - **Another process's writes** become visible after `FIRESTORE_REFRESH_MS`. Writes are always checked against the latest data.
 - **Free tier** normally covers one database per project; check your database page in the console. Outside it, usage is billed per read and write.
-- **Rate limits** key on the connection address. Behind a proxy (Vercel, Cloudflare Tunnel) every visitor shares one budget, 12 sign-ins per minute for the whole site. Fix this before a public launch.
+- **Rate limits** are per server instance. On Vercel they use the platform's overwritten client IP header; elsewhere they use the connection address. Other proxies such as Cloudflare Tunnel can still share one budget. Distributed abuse protection is not implemented.
 
 ## Troubleshooting
 

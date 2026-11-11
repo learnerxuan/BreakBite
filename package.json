@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Campus order-ahead with QR pickup, dietary information, saved meals and timetable planning",
   "engines": {
-    "node": ">=22.16.0"
+    "node": "22.x"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/assets.mjs",
@@ -26,6 +26,7 @@
     "typescript": "5.8.3"
   },
   "dependencies": {
+    "@vercel/blob": "2.4.0",
     "firebase-admin": "14.5.0"
   }
 }
