@@ -29,12 +29,12 @@ with sync_playwright() as p:
         page.keyboard.press('Tab')
         assert page.evaluate("Boolean(document.activeElement.closest('#mobile-basket-dialog'))"), 'Focus escaped the sheet'
     page.locator('#plan-form input[name=budget]').fill('19.50')
-    page.locator('#plan-form details').evaluate('(el) => el.open=true')
+    expect(page.get_by_text('Walking and buffer', exact=True)).to_have_count(0)
+    expect(page.locator('#plan-form input[name=walkToMinutes], #plan-form input[name=returnMinutes], #plan-form input[name=bufferMinutes]')).to_have_count(0)
     page.locator('[data-action=close-basket]').click()
     expect(page.locator('#mobile-break-button')).to_be_focused()
     page.locator('.bb-mobile-cart').click()
     expect(page.locator('#plan-form input[name=budget]')).to_have_value('19.50')
-    expect(page.locator('#plan-form details')).to_have_attribute('open', '')
     page.keyboard.press('Escape')
     expect(page.locator('#mobile-basket-button')).to_be_focused()
     expect(page.locator('#mobile-basket-dialog')).to_have_count(0)
@@ -87,4 +87,4 @@ with sync_playwright() as p:
     expect(guest.locator('.bb-stepper span')).to_have_text('1')
     assert not errors, errors
     browser.close()
-    print('PASS empty-basket access, Fit my break shortcut, draft/details preservation, focus and scroll return, quantities, single checkout modal, empty state, responsive sidebar/sheet and touch targets.')
+    print('PASS empty-basket access, Fit my break shortcut, draft preservation, no walking/buffer controls, focus and scroll return, quantities, single checkout modal, empty state, responsive sidebar/sheet and touch targets.')

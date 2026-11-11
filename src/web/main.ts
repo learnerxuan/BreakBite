@@ -22,7 +22,6 @@ let attempt: CheckoutAttempt | null = null;
 let actorGeneration = 0;
 let basketReturnFocus = 'mobile-basket-button';
 let basketScrollTop = 0;
-let basketDetailsOpen = false;
 
 function closeBasket(): void {
     s.mobileBasketOpen = false;
@@ -78,7 +77,7 @@ function setActor(actor: Actor | null): void {
         delete s.apspaceFeedback;
         delete s.apspaceReview;
         s.fitBreak = false; s.plan = defaultBreakPlan(); s.planDraft = {}; s.manualPlan = false;
-        s.mobileBasketOpen = false; basketScrollTop = 0; basketDetailsOpen = false;
+        s.mobileBasketOpen = false; basketScrollTop = 0;
         s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
         s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
         s.savings = { minutes: 0, checkouts: 0 };
@@ -138,8 +137,6 @@ function authDialog(): string {
 function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
-    const detailsBefore = root.querySelector<HTMLDetailsElement>('#plan-form details');
-    if (detailsBefore) basketDetailsOpen = detailsBefore.open;
     const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
     if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
     if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
@@ -155,10 +152,6 @@ function render(): void {
         dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!s.busy){if(dialog.id==='mobile-basket-dialog'){closeBasket();return;}if(dialog.id==='checkout-dialog'){returnToBasket();return;}stopCamera();s.scanner=false;s.qr=null;s.detailItem=null;s.auth=null;s.editing=null;s.quote=null;render();}});
     }
     root.querySelectorAll<HTMLInputElement>('button,input,select,textarea').forEach(b=>{if(s.busy)b.disabled=true;});
-    if (basketDetailsOpen) {
-        const details = root.querySelector<HTMLDetailsElement>('#plan-form details');
-        if (details) details.open = true;
-    }
     const modal = root.querySelector('dialog[open]');
     if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el && (!modal || modal.contains(el))){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
     const scrollAfter = root.querySelector<HTMLElement>('.bb-basket-scroll');

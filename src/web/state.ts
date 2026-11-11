@@ -25,7 +25,7 @@ export const emptyTimetable = (): TimetableState =>
 export function defaultBreakPlan(now = Date.now()): BreakPlan {
     const start = Math.ceil((now + 10 * 60000) / 300000) * 300000;
     return { breakStartAt: new Date(start).toISOString(), nextClassAt: new Date(start + 60 * 60000).toISOString(),
-        walkToMinutes: 3, returnMinutes: 5, eatMinutes: 12, bufferMinutes: 3, budgetSen: 2500 };
+        walkToMinutes: 0, returnMinutes: 0, eatMinutes: 12, bufferMinutes: 0, budgetSen: 2500 };
 }
 
 export interface ViewState {

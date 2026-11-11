@@ -48,7 +48,7 @@
 
 ## Time, policy and notices
 
-- Normal ordering has no class requirement. Fit my break adds optional walking/eating/return/buffer constraints.
+- Normal ordering has no class requirement. Fit my break optionally checks the selected break, food budget and eating time. The UI no longer asks for walking/return/buffer allowances; new plans send zero for those legacy contract fields. Historical plans and pending checkout payloads remain readable.
 - Kitchen workload and counter handover capacity are separate online allocations. Walk-in demand must be reserved by merchants.
 - New-order cutoff uses pickup start; normal cancellation requires both not preparing and before the snapshotted cancellation cutoff.
 - Vendor lateness beyond the agreed allowance enables no-strike cancellation; prepared ingredients are not returned to stock.

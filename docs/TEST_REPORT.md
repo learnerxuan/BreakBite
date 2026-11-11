@@ -1,3 +1,9 @@
+# Food waiting focus — 11 November 2026
+
+- Removed walking/return/buffer form controls and their deductions from new browser plans; legacy contract fields use zero. Historical plans and uncertain checkout payloads are preserved. The savings heading now says “Estimated food waiting time saved”; its preparation/readiness/lead-time calculation is unchanged.
+- `npm run check` passed strict TypeScript, **173 automated tests** and the production build. A new domain regression verifies zero walking/buffer is accepted without hidden time deductions. The build passed again after the wording update.
+- Normal-HTTP Chrome mobile basket, savings and full product/recovery journeys passed with disposable data, including absent walking controls, zero-allowance quote payloads, preserved drafts, timetable imports, lost-response recovery, responsive layout and collected-only preparation savings. After user-authorized restart, localhost and the LAN URL returned HTTP 200; a guest browser check confirmed the new controls locally. Physical-phone use remains unverified.
+
 # Mobile basket and break planning — 11 November 2026
 
 - `npm run check` passed strict TypeScript checking, **172 automated tests (0 failures)** and the production build.

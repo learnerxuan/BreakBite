@@ -29,7 +29,7 @@ export function parsePlan(input: unknown, now: number): MealPlan {
     const plan: BreakPlan = {
         breakStartAt: iso(p.breakStartAt, 'Break start'), nextClassAt: iso(p.nextClassAt, 'Next class'),
         walkToMinutes: integer(p.walkToMinutes, 'Walk to counter', 0, 30), eatMinutes: integer(p.eatMinutes, 'Eating time', 0, 60),
-        returnMinutes: integer(p.returnMinutes, 'Walk back', 0, 30), bufferMinutes: integer(p.bufferMinutes, 'Safety buffer', 1, 15),
+        returnMinutes: integer(p.returnMinutes, 'Walk back', 0, 30), bufferMinutes: integer(p.bufferMinutes, 'Safety buffer', 0, 15),
         budgetSen: integer(p.budgetSen, 'Budget in sen', 100, 50000),
     };
     requireThat(Date.parse(plan.nextClassAt) > now && Date.parse(plan.nextClassAt) <= now + 24 * 60 * MINUTE, 'INVALID_PLAN', 'Choose a class within the next 24 hours.');
@@ -68,7 +68,7 @@ function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan,
     if (items.some((x, i) => !x.enabled || x.stock < selections[i]!.quantity))
         reasons.push('Some items are sold out or have insufficient stock.');
     if (latest <= earliest)
-        reasons.push('Your break does not leave enough time to walk, collect and eat.');
+        reasons.push('Your break does not leave enough time to collect and eat.');
     const slots = reasons.length ? [] : s.slots.filter(x => Date.parse(x.startAt) >= earliest && Date.parse(x.endAt) <= latest && Date.parse(x.endAt) >= ready && Date.parse(x.startAt) - policies(s.vendor).cutoffMinutes * MINUTE > now && x.reservedUnits + units <= x.kitchenCapacity && x.reservedHandovers + 1 <= x.pickupCapacity);
     if (!slots.length && !reasons.length)
         reasons.push('No pickup window fits the current preparation time and available capacity. Choose another time or meal.');

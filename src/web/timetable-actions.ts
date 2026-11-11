@@ -5,24 +5,20 @@ import { fromLocal } from './ui.js';
 import { timetableDates } from './views/timetable.js';
 import { savedTimetableBreaks } from './views/apspace.js';
 
-const durationFields = ['walkToMinutes', 'returnMinutes', 'eatMinutes', 'bufferMinutes'] as const;
-const preferenceFields = ['budget', ...durationFields] as const;
+const preferenceFields = ['budget', 'eatMinutes'] as const;
 
 function preferences(form: HTMLFormElement): Omit<BreakPlan, 'breakStartAt' | 'nextClassAt'> {
     for (const name of preferenceFields) {
         const input = form.elements.namedItem(name) as HTMLInputElement;
         if (!input.validity.valid) {
-            // Walking and buffer fields can be inside a closed disclosure.
-            const details = input.closest('details');
-            if (details) details.open = true;
             input.reportValidity();
             throw new Error('Check your budget and time preferences.');
         }
     }
     const values = new FormData(form);
     return {
-        walkToMinutes: Number(values.get('walkToMinutes')), returnMinutes: Number(values.get('returnMinutes')),
-        eatMinutes: Number(values.get('eatMinutes')), bufferMinutes: Number(values.get('bufferMinutes')),
+        walkToMinutes: 0, returnMinutes: 0, bufferMinutes: 0,
+        eatMinutes: Number(values.get('eatMinutes')),
         budgetSen: Math.round(Number(values.get('budget')) * 100),
     };
 }

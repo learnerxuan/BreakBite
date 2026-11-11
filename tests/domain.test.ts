@@ -47,6 +47,13 @@ test('quotes account for eating, both walking legs, and buffer', async () => {
     assert.ok(q.slots.length > 0);
     assert.ok(q.slots.every(s => s.endAt <= q.latestPickupAt));
 });
+test('break planning supports zero walking and buffer without hidden time deductions', async () => {
+    const f = await fixture();
+    const q = await f.service.quote(alex, { ...f.input, plan: { ...f.plan, walkToMinutes: 0, returnMinutes: 0, bufferMinutes: 0 } });
+    assert.equal(q.earliestPickupAt, new Date(NOW).toISOString());
+    assert.equal(q.latestPickupAt, new Date(NOW + 28 * 60000).toISOString());
+    assert.ok(q.slots.length > 0);
+});
 test('short breaks, low budgets, sold-out food and closed vendors return no slots', async () => {
     const f = await fixture();
     assert.equal((await f.service.quote(alex, { ...f.input, plan: { ...f.plan, budgetSen: 200 } })).slots.length, 0);

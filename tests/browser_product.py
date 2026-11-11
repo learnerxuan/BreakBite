@@ -108,8 +108,7 @@ def test_timetable(page):
     }''')
     budget.fill('31.75')
     eat.fill('9')
-    page.locator('#plan-form details summary').click()
-    page.get_by_label('Return', exact=True).fill('4')
+    expect(page.get_by_text('Walking and buffer', exact=True)).to_have_count(0)
     # Exercise the real browser file picker event in addition to selecting synthetic bytes.
     with page.expect_file_chooser() as picker:
         field.press('Enter')
@@ -126,7 +125,6 @@ def test_timetable(page):
     expect(confirm).to_be_enabled()
     expect(budget).to_have_value('31.75')
     expect(eat).to_have_value('9')
-    expect(page.get_by_label('Return', exact=True)).to_have_value('4')
     for width in [360, 390, 768, 1440]:
         page.set_viewport_size({'width': width, 'height': 900})
         overflow(page)
@@ -255,6 +253,7 @@ with sync_playwright() as p:
     assert set(plans[-1]) == {'breakStartAt', 'nextClassAt', 'budgetSen', 'walkToMinutes',
                              'eatMinutes', 'returnMinutes', 'bufferMinutes'}
     assert plans[-1]['budgetSen'] == 3175 and plans[-1]['eatMinutes'] == 9
+    assert plans[-1]['walkToMinutes'] == plans[-1]['returnMinutes'] == plans[-1]['bufferMinutes'] == 0
     student.set_viewport_size({'width':390,'height':844})
     overflow(student);student.screenshot(path=str(OUT/'checkout-mobile.png'),full_page=True)
     # Lose one response after the actual server commit. The same request is recovered, not submitted twice.

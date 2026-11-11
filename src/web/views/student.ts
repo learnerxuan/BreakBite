@@ -24,9 +24,6 @@ function breakForm(s: ViewState): string {
         <label>Next commitment (MYT)<input name="nextClassAt" type="datetime-local" step="0.001" value="${value('nextClassAt', localValue(s.plan.nextClassAt, true))}" required></label>
         <div class="bb-two"><label>Food budget (RM)<input name="budget" type="number" min="1" max="500" step=".01" value="${value('budget', s.plan.budgetSen / 100)}" required></label>
         <label>Time to eat (min)<input name="eatMinutes" type="number" min="0" max="60" value="${value('eatMinutes', s.plan.eatMinutes)}" required></label></div>
-        <details><summary>Walking and buffer</summary><div class="bb-three">
-        ${(['walkToMinutes', 'returnMinutes', 'bufferMinutes'] as const).map((k, i) => `<label>${['To food', 'Return', 'Buffer'][i]}<input name="${k}" type="number" min="${k === 'bufferMinutes' ? 1 : 0}" max="${k === 'bufferMinutes' ? 15 : 30}" value="${value(k, s.plan[k])}" required></label>`).join('')}
-        </div></details>
         <button class="bb-button secondary" type="submit" ${s.uncertain ? 'disabled' : ''}>Apply time preferences</button></form>`;
 }
 
@@ -40,7 +37,7 @@ export function basket(s: ViewState): string {
         return `<div class="bb-cart-line"><div><strong>${esc(i?.name ?? 'Unavailable item')}</strong><small>${i ? money(i.priceSen) : 'Remove this item'}</small></div><div class="bb-stepper"><button aria-label="Remove one ${esc(i?.name)}" data-action="minus" data-vendor="${esc(id)}" data-id="${esc(c.itemId)}">−</button><span>${c.quantity}</span><button aria-label="Add one ${esc(i?.name)}" data-action="plus" data-vendor="${esc(id)}" data-id="${esc(c.itemId)}">+</button></div></div>`;
     }).join('')}</section>`).join('')}
     ${ids.length ? `<div class="bb-total"><span>Estimated total</span><strong>${money(total)}</strong></div><p class="bb-small">Pay separately at each kitchen when you collect. No online charge.</p>` : ''}
-    ${ids.length && potential ? `<p class="bb-prep-preview">${icon('clock')} Order ahead could avoid up to <strong>~${potential} min</strong> of preparation waiting.<small>Estimate before pickup; kitchens may prepare in parallel.</small></p>` : ''}
+    ${ids.length && potential ? `<p class="bb-prep-preview">${icon('clock')} Estimated food waiting time you could save: up to <strong>~${potential} min</strong>.<small>Based on food preparation; actual savings depend on when it is ready. Kitchens may prepare in parallel.</small></p>` : ''}
     <label class="bb-toggle"><input id="fit-toggle" type="checkbox" ${s.fitBreak?'checked':''} ${s.uncertain?'disabled':''}> <span>Fit my break <small>Optional time and budget helper</small></span></label>
     ${s.fitBreak ? savedBreaksSection(s, true) + (s.config?.apspaceConfigured && s.actor ? '' : timetableSection(s)) + breakForm(s) : ''}
     ${s.basketMessages.map(message=>`<p class="bb-warning">${esc(message)}</p>`).join('')}
