@@ -35,7 +35,7 @@ npm start
 | Saved meals | Favourites, recently ordered meals, named usual baskets, rename/remove and repeat ordering with current prices, food information and fresh slots. |
 | Food information | Vendor-entered ingredients, spice, dietary declarations, contains/may-contain warnings and evidence references; saved student restrictions and explicit unknown states. |
 | Campus content | Editable kitchen campus/location/menu source, permission-confirmed local photograph uploads, responsive APU-focused interface. |
-| Availability | Dedicated **Availability** tab, separate from Explore. Current online kitchen/counter allocation and next available windows; no claim to measure the physical queue or predict demand. |
+| Availability | Dedicated **Availability** tab, separate from Explore. Online preparing/scheduled/ready counts, kitchen status and meal-specific pickup estimates; no claim to measure physical queues or cooking progress. |
 | Collection policies | Configurable ordering/cancellation cutoffs, snapshotted order rules, server-generated ready/due/overdue reminders, merchant-confirmed uncollected closure and corrections. |
 | Timetable | Manual classes and `.ics` imports, plus opt-in APSpace import by typed intake code and group. Review classes once, then use saved gaps in the planner or basket. Changes require review. |
 | Deadline help | Move a not-yet-preparing order into genuinely free earlier capacity, or request reviewed alternatives. Other students are never pushed back. |
@@ -112,7 +112,7 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm
 
 ## Verification and guides
 
-- `npm run check`: type checking, **172 automated tests**, production build.
+- `npm run check`: type checking, **177 automated tests**, production build.
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)
@@ -122,3 +122,5 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm
 - [Implemented architecture](docs/IMPLEMENTATION.md)
 - [API](docs/API.md)
 - [Future Google/Gemini setup](docs/MANUAL_SETUP.md)
+
+- [Functional UAT checklist and sign-off](docs/UAT.md): 34 manual scenarios; physical-device acceptance is recorded separately from automated checks.

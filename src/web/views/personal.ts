@@ -1,3 +1,4 @@
+import { kitchenStatus, kitchenActivity, loadIsFresh } from './kitchen-status.js';
 import { apspaceConnectionSection, savedBreaksSection } from './apspace.js';
 import { pushPanel } from '../push-client.js';
 import { ALLERGENS, DIETS, label, foodCheck, DEFAULT_POLICY } from '../../shared/features.js';
@@ -5,7 +6,6 @@ import { money, time, type MenuItem } from '../../shared/model.js';
 import type { ViewState } from '../state.js';
 import { esc, localValue, art, short } from '../ui.js';
 import { qrSvg } from '../../shared/qr.js';
-import type { BookingLoad } from '../../shared/features.js';
 export function foodSummary(i: MenuItem): string {
     const f = i.foodInfo;
     const claim = (d: string) => { const e = d === 'halal' ? f?.halalEvidence : f?.glutenFreeEvidence; return e && Date.parse(`${e.expiresOn}T23:59:59+08:00`) >= Date.now() ? ' · vendor evidence' : ' · evidence missing/expired'; };
@@ -14,20 +14,11 @@ export function foodSummary(i: MenuItem): string {
 export function photo(i: MenuItem): string {
     return i.photoPath && (/^\/media\/[a-f0-9]{64}\.(png|jpg|webp)$/.test(i.photoPath) || /^\/images\/(cafeterias|menu)\/[a-z0-9-]+\.jpg$/.test(i.photoPath)) ? `<img class="bb-food-photo" src="${esc(i.photoPath)}" alt="${esc(i.name)}" loading="lazy">` : art(i.art);
 }
-export function bookableRanges(slots: BookingLoad['slots']): {startAt:string;endAt:string}[] {
-    const ranges: {startAt:string;endAt:string}[] = [];
-    for (const slot of slots.filter(w=>w.level==='available'||w.level==='filling').sort((a,b)=>a.startAt.localeCompare(b.startAt))) {
-        const last = ranges.at(-1);
-        if(last && last.endAt === slot.startAt) last.endAt = slot.endAt;
-        else ranges.push({startAt:slot.startAt,endAt:slot.endAt});
-    }
-    return ranges;
-}
-export function loadsView(s: ViewState, onlyVendor?: string, heading = 'Kitchen availability'): string {
+export function loadsView(s: ViewState, onlyVendor?: string, heading = 'Kitchen status'): string {
     const loads = s.loads.filter(l => !onlyVendor || l.vendorId === onlyVendor);
-    return `<section class="bb-loads" aria-label="Online pickup capacity"><div class="bb-section-head"><div><p class="bb-kicker">PLAN YOUR PICKUP</p><h2>${esc(heading)}</h2></div><span class="bb-small">Online pickup capacity · MYT</span></div><div class="bb-load-grid">${loads.map(l => {
-        const ranges = l.open ? bookableRanges(l.slots) : [];
-        return `<article class="bb-load-card"><h3>${esc(s.vendors.find(v => v.id === l.vendorId)?.name)}</h3><p>${!l.open ? 'Kitchen closed' : l.nextAvailableAt ? `Next pickup from <strong>${time(l.nextAvailableAt)}</strong>` : 'No bookable window right now'}</p>${ranges.length?`<p class="bb-small">Bookable pickup ranges</p><ul class="bb-load-ranges">${ranges.slice(0,3).map(r=>`<li>${time(r.startAt)}–${time(r.endAt)}</li>`).join('')}</ul>${ranges.length>3?`<p class="bb-small">${ranges.length-3} later ranges in slot details.</p>`:''}`:''}<details data-load-vendor="${esc(l.vendorId)}"><summary>View slot availability</summary><div class="bb-load-timeline">${l.slots.map(w => `<div class="bb-load-cell ${w.level}" title="${time(w.startAt)} · ${w.percent}% of online allocation booked"><span>${time(w.startAt)}</span><strong>${{ available: 'Available', filling: 'Filling up', full: 'Full', closed: 'Closed' }[w.level]}</strong></div>`).join('')}</div></details><small>Updated ${time(l.updatedAt)} MYT. These are pickup windows, not opening hours or a physical queue estimate. Your meal and basket are checked at checkout.</small></article>`;
+    return `<section class="bb-loads" aria-label="Kitchen status"><div class="bb-section-head"><div><p class="bb-kicker">PLAN YOUR PICKUP</p><h2>${esc(heading)}</h2></div><span class="bb-small">Online orders only · MYT</span></div><div class="bb-load-grid">${loads.map(l => {
+        const fresh=loadIsFresh(s,l);
+        return `<article class="bb-load-card"><div class="bb-section-head"><h3>${esc(s.vendors.find(v=>v.id===l.vendorId)?.name)}</h3>${kitchenStatus(s,l.vendorId)}</div><p class="bb-kitchen-activity">${fresh?esc(kitchenActivity(l)):'Live status unavailable — reconnect or refresh.'}</p><p>${!fresh?'Pickup estimate unavailable':!l.open?'Kitchen closed':l.nextAvailableAt?`Earliest estimated pickup <strong>${time(l.nextAvailableAt)}</strong>`:'No pickup available right now'}</p><small>Updated ${time(l.updatedAt)} MYT. Counts cover BreakBite orders, including scheduled orders for later. Walk-ins are not tracked. Choose a meal for its pickup estimate; your basket is confirmed at checkout.</small></article>`;
     }).join('')}</div></section>`;
 }
 export function favouriteStrip(s: ViewState): string {
@@ -69,5 +60,5 @@ export function policySummary(s: ViewState, vendorId: string): string {
 }
 
 export function availabilityView(s: ViewState): string {
-    return `<section class="bb-page-heading"><p class="bb-kicker">PICK A TIME THAT WORKS</p><h1>Kitchen availability</h1><p>Compare online pickup windows before choosing your meal. This shows booking capacity, not a live physical queue.</p><button class="bb-button secondary" data-view="explore">Back to Explore</button></section>${s.offline ? '<p class="bb-error" role="status">Connection lost. Availability below may be out of date.</p>' : ''}${s.loads.length ? loadsView(s, undefined, 'Available pickup windows') : '<div class="bb-empty"><h2>No pickup windows yet</h2><p>Please check again shortly or browse the menu.</p></div>'}`;
+    return `<section class="bb-page-heading"><p class="bb-kicker">PICK A TIME THAT WORKS</p><h1>Kitchen availability</h1><p>See kitchen status, online order activity and earliest pickup estimates. Meal and quantity affect your final pickup time.</p><button class="bb-button secondary" data-view="explore">Back to Explore</button></section>${s.offline ? '<p class="bb-error" role="status">Connection lost. Availability below may be out of date.</p>' : ''}${s.loads.length ? loadsView(s, undefined, 'Kitchen status') : '<div class="bb-empty"><h2>No pickup windows yet</h2><p>Please check again shortly or browse the menu.</p></div>'}`;
 }

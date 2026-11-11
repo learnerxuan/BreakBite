@@ -375,13 +375,13 @@ export class ProductService {
     /** Runs independently of any browser. Notifications remain in the account inbox after restart. */
     async tick(): Promise<void> {
         const now = this.clock(); const snapshot = this.db.read();
-        const needs = Object.values(snapshot.vendors).some(s => s.orders.some(o => !isClosed(o.status) && (o.status === 'ready' || o.vendorDelayed)));
+        const needs = Object.values(snapshot.vendors).some(s => s.orders.some(o => !isClosed(o.status) && (o.status === 'ready' || o.vendorDelayed || delayedCancellation(o, now))));
         if (!needs) return;
         const all = (d: LocalData) => {
             for (const s of Object.values(d.vendors)) for (const o of s.orders) {
                 if (isClosed(o.status)) continue;
                 if (delayedCancellation(o, now)) o.vendorDelayed = true;
-                if (o.vendorDelayed) notice(d, o, `delay-${o.estimatedReadyAt}`, `${s.vendor.name} reported a delay. Review alternatives or eligible cancellation.`, now);
+                if (o.vendorDelayed) notice(d, o, `delay-${o.estimatedReadyAt}`, `Your order at ${s.vendor.name} is delayed. Review alternatives or eligible cancellation.`, now);
                 if (o.status !== 'ready') continue;
                 o.readyAt ??= stamp(now); // Legacy ready orders receive a fresh grace period on upgrade.
                 o.collectionDueAt ??= stamp(Math.max(Date.parse(s.slots.find(w => w.id === o.slotId)!.endAt), Date.parse(o.readyAt)) + (o.policy?.holdMinutes ?? 15) * minute);

@@ -29,6 +29,7 @@ export function defaultBreakPlan(now = Date.now()): BreakPlan {
 }
 
 export interface ViewState {
+    history: { search: string; status: string; date: string };
     savings: SavingsSummary;
     profile: StudentProfile; notices: Notice[]; loads: BookingLoad[];
     apspaceSetup?: { options: { intake: string; groups: string[] }[]; intake: string; group: string; invalid?: boolean };
@@ -53,7 +54,7 @@ export interface ViewState {
 export function initialState(): ViewState {
     let cart: CartLine[] = [];
     try { const c: unknown = JSON.parse(sessionStorage.getItem('breakbite-cart-v2') ?? '[]'); if (Array.isArray(c) && c.length <= 25) cart = c.filter(x => x && typeof x.itemId === 'string' && typeof x.vendorId === 'string' && Number.isInteger(x.quantity) && x.quantity > 0 && x.quantity <= 5); } catch { /* Ignore an invalid client cache; the server validates everything. */ }
-    return { profile: emptyProfile(), notices: [], loads: [], detailItem: null, qr: null, scanner: false, scanResult: null, scanPayload: "", basketMessages: [], earlier: {}, config: null, actor: null, snapshot: null, vendors: [], items: [], cart, view: 'explore', vendorTab: 'queue', search: '', category: 'All', vendorFilter: 'all', allergenFilters: [], fitBreak: false,
+    return { history: {search:'',status:'all',date:''}, profile: emptyProfile(), notices: [], loads: [], detailItem: null, qr: null, scanner: false, scanResult: null, scanPayload: "", basketMessages: [], earlier: {}, config: null, actor: null, snapshot: null, vendors: [], items: [], cart, view: 'explore', vendorTab: 'queue', search: '', category: 'All', vendorFilter: 'all', allergenFilters: [], fitBreak: false,
         mobileBasketOpen: false, savings: { minutes: 0, checkouts: 0 }, plan: defaultBreakPlan(), planDraft: {}, manualPlan: false, timetable: emptyTimetable(), serverClock: null,
         quote: null, chosen: {}, transferMinutes: 2, busy: false, offline: false, auth: null, authError: '', editing: null, recovery: {}, checkoutError: '', success: '', uncertain: false };
 }

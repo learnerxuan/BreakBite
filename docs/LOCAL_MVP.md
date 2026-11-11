@@ -28,8 +28,8 @@ The added project-purpose menus contain sample ingredients, spice levels, warnin
 
 - On phones/tablets, the fixed **Your basket** and **Fit my break** shortcuts open a bottom sheet, including when the basket is empty. Close it to continue browsing; basket contents and time drafts are preserved. Desktop keeps the basket sidebar.
 - Fit my break asks for your break times, food budget and eating time. Walking and buffer controls are removed. The time-saved panel estimates food preparation waiting avoided; it is independent of these preferences.
-- Kitchen operators use **Close kitchen** to hide food from student browsing and stop new orders; **Reopen kitchen** restores it. Closure persists until manually reopened. Existing orders remain actionable. Finished orders are in the **Order history** tab, with collected/cancelled/uncollected status, amounts and dated updates.
-- Availability shows up to three upcoming bookable pickup ranges, with all slots under **View slot availability**. Full, closed and missing windows split ranges. These are online reservation windows, not verified opening hours or a physical queue measurement.
+- Kitchen operators use **Close kitchen** to hide food from student browsing and stop new orders; **Reopen kitchen** restores it. Closure persists until manually reopened. Existing orders remain actionable. Finished orders are in the **Order history** table, with collected/cancelled/uncollected status, amounts and dated updates. Filter by order/checkout ID, status or updated date (MYT).
+- Availability shows Open/Delayed/Closed kitchen status, anonymous online preparing/scheduled/ready counts and the earliest estimated pickup. Menu cards show per-meal estimates for one portion, using the same preparation/delay/capacity/cutoff rules as checkout. Estimates do not reserve anything; the full basket is checked at checkout. Offline/stale status is explicitly unavailable. Walk-ins and cooking progress are not measured.
 - Add food from one kitchen and a drink from another to the same basket.
 - Choose a pickup window for each kitchen. The default suggestion staggers windows.
 - Set a realistic walking time between counters. One minute per handover is also reserved in the itinerary check.
@@ -143,3 +143,7 @@ COOKIE_SECURE=false
 - Save preferences, favourites/usual orders and optional timetables through the student pages. Imported calendars are private snapshots, not APSpace live sync.
 - Photos are saved locally in `.data/media/`. The source repository must never contain private data or unauthorised photographs.
 - Public hosting and closed-browser push delivery are not completed by running the local server.
+
+## Manual acceptance
+
+Use [UAT.md](UAT.md) for 34 executable student/kitchen scenarios and sign-off. Automated evidence in TEST_REPORT.md is separate from physical-phone and operator acceptance.

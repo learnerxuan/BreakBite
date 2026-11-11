@@ -1,6 +1,6 @@
 import { foodCheck, isClosed } from '../shared/features.js';
 import { parseFoodInfo, foodRevision } from './food.js';
-import { policies, parsePolicy, delayedCancellation } from './policy.js';
+import { policies, parsePolicy, delayedCancellation, availablePickupWindows } from './policy.js';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Actor, BreakPlan, MealPlan, MenuItem, Order, OrderLine, Proposal, PublicOrder, Quote, RecoveryOption, Selection, Slot, Snapshot, VendorState } from '../shared/model.js';
 import { atRisk } from '../shared/model.js';
@@ -69,7 +69,7 @@ function calculateQuote(s: VendorState, selections: Selection[], plan: MealPlan,
         reasons.push('Some items are sold out or have insufficient stock.');
     if (latest <= earliest)
         reasons.push('Your break does not leave enough time to collect and eat.');
-    const slots = reasons.length ? [] : s.slots.filter(x => Date.parse(x.startAt) >= earliest && Date.parse(x.endAt) <= latest && Date.parse(x.endAt) >= ready && Date.parse(x.startAt) - policies(s.vendor).cutoffMinutes * MINUTE > now && x.reservedUnits + units <= x.kitchenCapacity && x.reservedHandovers + 1 <= x.pickupCapacity);
+    const slots = reasons.length ? [] : availablePickupWindows(s, now, units, ready, earliest, latest);
     if (!slots.length && !reasons.length)
         reasons.push('No pickup window fits the current preparation time and available capacity. Choose another time or meal.');
     return { vendorId: s.vendor.id, totalSen, earliestPickupAt: stamp(earliest), latestPickupAt: stamp(latest), slots: structuredClone(slots), reasons };

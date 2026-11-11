@@ -64,6 +64,7 @@ function invalidate(): void { s.quote=null;s.chosen={};s.checkoutError='';clearA
 const timetable = timetableActions(s, render, invalidate, notify);
 function navigate(view: typeof s.view): void {
     if (view !== 'explore' && s.timetable.loading) timetable.cancelPreview();
+    if (view !== s.view) window.scrollTo({top:0});
     s.view = view;
     if (view !== 'explore') s.mobileBasketOpen = false;
 }
@@ -81,6 +82,7 @@ function setActor(actor: Actor | null): void {
         s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
         s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
         s.savings = { minutes: 0, checkouts: 0 };
+        s.history = {search:'',status:'all',date:''};
     }
     s.actor = actor;
 }
@@ -138,7 +140,6 @@ function authDialog(): string {
 function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
-    const openLoads = new Set([...root.querySelectorAll<HTMLDetailsElement>('details[data-load-vendor][open]')].map(el=>el.dataset.loadVendor));
     const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
     if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
     if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
@@ -157,7 +158,6 @@ function render(): void {
     const modal = root.querySelector('dialog[open]');
     if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el && (!modal || modal.contains(el))){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
     const scrollAfter = root.querySelector<HTMLElement>('.bb-basket-scroll');
-    root.querySelectorAll<HTMLDetailsElement>('details[data-load-vendor]').forEach(el=>{el.open=openLoads.has(el.dataset.loadVendor);});
     if (scrollAfter && s.mobileBasketOpen) scrollAfter.scrollTop = basketScrollTop;
 }
 async function work(fn: ()=>Promise<void>): Promise<void> {
@@ -265,6 +265,7 @@ root.addEventListener('click',event=>{
     }
     if(action==='login'){s.auth='login';s.authError='';render();return;}
     if(action==='switch-auth'){s.auth=s.auth==='login'?'register':'login';s.authError='';render();return;}
+    if(action==='clear-history'){s.history={search:'',status:'all',date:''};render();return;}
     if(action==='close-auth'){s.auth=null;s.authError='';render();return;}
     if(action==='close-checkout'){returnToBasket();return;}
     if(action==='close-editor'){s.editing=null;render();return;}
@@ -340,6 +341,7 @@ root.addEventListener('input', event => {
 });
 root.addEventListener('submit',event=>{
     event.preventDefault();const form=event.target as HTMLFormElement;const f=new FormData(form);if(extra.submit(form))return;
+    if(form.id==='history-form'){s.history={search:String(f.get('historySearch')??'').trim(),status:String(f.get('historyStatus')??'all'),date:String(f.get('historyDate')??'')};render();return;}
     if(form.id==='search-form'){s.search=String(f.get('search')??'');render();return;}
     if(form.id==='plan-form'){
         if(s.busy||s.uncertain)return;

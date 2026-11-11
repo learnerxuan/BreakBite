@@ -53,13 +53,13 @@
 - New-order cutoff uses pickup start; normal cancellation requires both not preparing and before the snapshotted cancellation cutoff.
 - Vendor lateness beyond the agreed allowance enables no-strike cancellation; prepared ingredients are not returned to stock.
 - Ready captures actual time. Grace ends at max(actual Ready, booked window end) + agreed hold duration.
-- A server timer runs every 15 seconds and creates deduplicated private inbox notices. Late/overdue state does not depend on a student leaving the website open.
+- A server timer runs every 15 seconds and creates deduplicated private inbox notices, including unreported overdue preparation even when there are no ready orders. Late/overdue state does not depend on a student leaving the website open.
 - Overdue orders remain collectable until a merchant closes them with a reason. No automatic bans/fees, inventory restoration or retroactive capacity release.
 - Opt-in background Web Push uses a durable queue and a push-only service worker. Real closed-tab device delivery remains unverified; email/SMS are not implemented.
 
 ## Availability and earlier assistance
 
-- Booking indicators use the larger of kitchen and counter allocation usage. Labels show Available/Filling/Full/Closed and update time.
+- Public kitchen summaries expose only aggregate confirmed/scheduled, preparing and ready counts, a delay flag and one-portion per-item pickup estimates. `availablePickupWindows` is shared with actual quotes and checks kitchen workload, counter capacity, prep/delays and cutoff. Predictions never reserve slots or expose order/student identities. The browser hides live estimates after connectivity loss/staleness; checkout remains authoritative for actual basket quantities and restrictions.
 - They do not measure physical lines or predict historical peaks.
 - Earlier-slot selection rechecks free capacity, current price/workload/food review and sibling timings atomically.
 - No other customer's reservation is displaced. If no suitable slot exists, preserve the original order.

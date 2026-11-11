@@ -129,6 +129,15 @@ test('vendor-late prepared cancellation does not restock consumed food or punish
     await f.service.reportIncident(op,o.vendorId,{reason:'Equipment issue',delayMinutes:20,itemIds:[]});await f.service.cancel(a,o.vendorId,o.id);
     const current=f.db.read().vendors['bowl-lab']!.orders[0]!;assert.equal(current.status,'cancelled');assert.equal(current.closedReason,'vendor_delay');assert.equal(f.db.read().vendors['bowl-lab']!.items[0]!.stock,stock);assert.ok(!current.noShowRecorded);
 });
+test('an unreported overdue preparation generates one delay notice even with no ready orders',async t=>{
+    const f=await setup(t);const o=await f.order();
+    f.setNow(Date.parse(o.promisedPickupEndAt!)+6*60000);
+    await f.product.tick();await f.product.tick();
+    assert.equal(f.db.read().vendors['bowl-lab']!.orders[0]!.vendorDelayed,true);
+    assert.equal(f.product.profile(a).notices.length,1);
+    assert.match(f.product.profile(a).notices[0]!.message,/delay/i);
+    assert.equal(f.product.profile(b).notices.length,0);
+});
 test('early ready does not expire before scheduled pickup; reminders are durable and deduplicated',async t=>{
     const f=await setup(t);const o=await f.order();await f.ready(o.id);const current=f.db.read().vendors['bowl-lab']!.orders[0]!;
     assert.equal(Date.parse(current.collectionDueAt!),Date.parse(current.promisedPickupEndAt!)+15*60000);
