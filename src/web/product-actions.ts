@@ -1,7 +1,8 @@
 import type { ViewState } from './state.js';
 import type { PublicOrder, RecoveryOption, Slot } from '../shared/model.js';
-import { api } from './client.js';
+import { api, ApiError } from './client.js';
 import { fromLocal } from './ui.js';
+import { apspaceGroupOptions, apspaceIntake } from './views/apspace.js';
 interface Hooks { work(fn: () => Promise<void>): Promise<void>; render(): void; refresh(): Promise<void>; invalidate(): void; notify(message: string, error?: boolean): void; }
 let stream: MediaStream | null = null;
 let scanGeneration = 0;
@@ -39,6 +40,30 @@ async function imageData(file: File): Promise<string> {
     } finally { image.close(); }
 }
 export function productActions(s: ViewState, h: Hooks) {
+    const focus = (id: string) => document.getElementById(id)?.focus();
+    async function workOnTimetable(progress: string, task: () => Promise<string>): Promise<void> {
+        delete s.apspaceFeedback;
+        const feedback = document.getElementById('apspace-feedback');
+        if (feedback) {
+            feedback.className = '';
+            feedback.setAttribute('role', 'status');
+            feedback.textContent = progress;
+        }
+        let focusId = '';
+        await h.work(async () => {
+            try { focusId = await task(); }
+            catch (error) {
+                if (error instanceof ApiError && error.status === 401) throw error;
+                s.apspaceFeedback = {
+                    text: error instanceof ApiError && error.status < 500
+                        ? error.message : 'BreakBite cannot check APSpace now. Try again or import a calendar file.',
+                    error: true,
+                };
+                focusId = 'apspace-feedback';
+            }
+        });
+        if (focusId) focus(focusId);
+    }
     async function resolve(payload: string): Promise<void> {
         s.scanResult = await post<PublicOrder>('pickup/resolve', { payload }); s.scanPayload = payload; h.render();
     }
@@ -49,11 +74,43 @@ export function productActions(s: ViewState, h: Hooks) {
             if (action === 'food-details') { s.detailItem = s.items.find(i => i.id === id) ?? null; h.render(); return true; }
             if (action === 'open-scanner') { s.scanner = true; s.scanResult = null; h.render(); return true; }
             if (action === 'start-camera') { void startCamera(payload => h.work(() => resolve(payload))).catch(e => h.notify(e instanceof Error ? e.message : 'Camera unavailable.', true)); return true; }
-            const actions = ['favourite', 'save-usual', 'rename-usual', 'remove-usual', 'reorder', 'qr', 'start-camera', 'read-notices', 'delete-class', 'clear-classes', 'use-break', 'help-order', 'move-earlier', 'ask-alternative', 'uncollected', 'correct-no-show', 'remove-photo'];
+            if (action === 'apspace-setup-cancel') {
+                delete s.apspaceSetup;
+                delete s.apspaceFeedback;
+                h.render();
+                focus('apspace-connect-open');
+                return true;
+            }
+            if (action === 'apspace-connect-open' || action === 'apspace-connect-refresh' ||
+                action === 'apspace-connect-disconnect' || action === 'apspace-connect-discard') {
+                if (s.actor?.role !== 'student' || s.uncertain) return true;
+                if (action === 'apspace-connect-disconnect' && s.profile.apspace &&
+                    !confirm('Disconnect APSpace and remove its saved classes?')) return true;
+                void workOnTimetable(action === 'apspace-connect-disconnect' || action === 'apspace-connect-discard'
+                    ? 'Updating your timetable…' : 'Checking APSpace…', async () => {
+                    if (action === 'apspace-connect-open') {
+                        const options = await api<NonNullable<ViewState['apspaceSetup']>['options']>('/api/product/timetable/apspace/options');
+                        s.apspaceSetup = { options, intake: s.profile.apspace?.intake ?? '', group: s.profile.apspace?.group ?? '' };
+                        return 'apspace-connect-intake';
+                    } else if (action === 'apspace-connect-discard') {
+                        await post('timetable/apspace/discard', { previewId: id });
+                        await h.refresh();
+                        return 'apspace-connect-open';
+                    } else {
+                        await post(action === 'apspace-connect-refresh' ? 'timetable/apspace/refresh' : 'timetable/apspace/disconnect');
+                        if (action === 'apspace-connect-disconnect') delete s.apspaceSetup;
+                        await h.refresh();
+                        s.apspaceFeedback = { text: action === 'apspace-connect-disconnect' ? 'BreakBite disconnected APSpace.' : 'BreakBite checked your timetable.' };
+                        return s.profile.apspacePreview ? 'apspace-review-heading' : 'apspace-feedback';
+                    }
+                });
+                return true;
+            }
+            const actions = ['favourite', 'save-usual', 'rename-usual', 'remove-usual', 'reorder', 'qr', 'start-camera', 'read-notices', 'delete-class', 'clear-classes', 'help-order', 'move-earlier', 'ask-alternative', 'uncollected', 'correct-no-show', 'remove-photo'];
             if (!action || !actions.includes(action)) return false;
             if (!s.actor) { s.auth = 'login'; h.render(); return true; }
             void h.work(async () => {
-                if (['reorder', 'use-break'].includes(action) && s.uncertain) throw new Error('Recover the uncertain checkout before changing your basket or time plan.');
+                if (action === 'reorder' && s.uncertain) throw new Error('Recover the uncertain checkout before changing your basket.');
                 if (action === 'favourite') { await post('favourite', { itemId: id, saved: !s.profile.favourites.includes(id) }); await h.refresh(); }
                 else if (action === 'save-usual') { const name = prompt('Name this usual order:', 'My campus lunch'); if (!name?.trim()) return; await post('usual', { name, lines: s.cart }); await h.refresh(); h.notify('Usual order saved. Pickup times are selected each time.'); }
                 else if (action === 'rename-usual') { const name = prompt('New name:', s.profile.usuals.find(u => u.id === id)?.name); if (!name?.trim()) return; await post('usual', { id, name }); await h.refresh(); }
@@ -68,8 +125,11 @@ export function productActions(s: ViewState, h: Hooks) {
                 } 
                 else if (action === 'read-notices') { await post('notices/read'); await h.refresh(); }
                 else if (action === 'delete-class') { await post('timetable/delete', { id }); await h.refresh(); }
-                else if (action === 'clear-classes') { if (!confirm('Delete all saved classes and the pending import preview?')) return; await post('timetable/delete', { all: true }); await h.refresh(); }
-                else if (action === 'use-break') { s.fitBreak = true; s.plan.breakStartAt = target.dataset.start!; s.plan.nextClassAt = target.dataset.end!; h.invalidate(); s.view = 'explore'; h.notify('Break applied. Review walking/eating times and live pickup availability.'); }
+                else if (action === 'clear-classes') {
+                    if (!confirm(s.profile.apspace ? 'Delete all saved classes and disconnect APSpace?' : 'Delete all saved classes and pending import previews?')) return;
+                    await post('timetable/delete', { all: true });
+                    await h.refresh();
+                }
                 else if (action === 'help-order') {
                     s.earlier[id] = await post<{ slots: Slot[]; message: string }>('earlier/options', { vendorId, orderId: id });
                     s.recovery[id] = await post<{ options: RecoveryOption[]; message: string }>('assistance', { vendorId, orderId: id }); await h.refresh();
@@ -82,7 +142,63 @@ export function productActions(s: ViewState, h: Hooks) {
                 else if (action === 'remove-photo') { await post('photo', { itemId: id, remove: true }); await h.refresh(); if (s.editing && s.editing !== 'new') s.editing = s.items.find(i => i.id === id)!; }
             }); return true;
         },
+        input(input: HTMLInputElement | HTMLSelectElement): boolean {
+            const form = input.form;
+            if (s.busy || s.uncertain || !form) return false;
+            const setup = s.apspaceSetup;
+            if (form.id === 'apspace-connect-setup' && setup) {
+                if (input.id === 'apspace-connect-intake') {
+                    const previous = apspaceIntake(setup);
+                    setup.intake = input.value;
+                    delete setup.invalid;
+                    input.removeAttribute('aria-invalid');
+                    document.getElementById('apspace-intake-error')!.hidden = true;
+                    const intake = apspaceIntake(setup);
+                    if (intake !== previous) {
+                        const group = form.elements.namedItem('group') as HTMLSelectElement;
+                        const groups = intake?.groups ?? [];
+                        group.innerHTML = apspaceGroupOptions(groups, '');
+                        group.disabled = !groups.length;
+                        setup.group = group.value;
+                    }
+                } else if (input.name === 'group') setup.group = input.value;
+                return true;
+            }
+            if (form.id === 'apspace-connect-confirm' && form.dataset.preview) {
+                const values = new FormData(form);
+                s.apspaceReview = { id: form.dataset.preview, selectedIds: values.getAll('classId').map(String), consent: values.has('consent') };
+                return true;
+            }
+            return false;
+        },
         submit(form: HTMLFormElement): boolean {
+            if (form.id === 'apspace-connect-setup' || form.id === 'apspace-connect-confirm') {
+                if (s.actor?.role !== 'student' || s.uncertain || !s.config?.apspaceConfigured) return true;
+                const values = new FormData(form);
+                const previewId = form.dataset.preview;
+                const setup = s.apspaceSetup;
+                const intake = setup && apspaceIntake(setup);
+                if (form.id === 'apspace-connect-setup' && setup && !intake) {
+                    setup.invalid = true;
+                    h.render();
+                    focus('apspace-connect-intake');
+                    return true;
+                }
+                void workOnTimetable(form.id === 'apspace-connect-setup' ? 'Loading classes…' : 'Saving your timetable…', async () => {
+                    if (form.id === 'apspace-connect-setup') {
+                        if (!intake) throw new Error('Check your intake code in APSpace.');
+                        await post('timetable/apspace/preview', { intake: intake.intake, group: values.get('group') });
+                        delete s.apspaceSetup;
+                    } else {
+                        await post('timetable/apspace/confirm', { previewId, ids: values.getAll('classId'), consent: values.get('consent') === 'on' });
+                        delete s.apspaceReview;
+                        s.apspaceFeedback = { text: 'BreakBite saved your timetable.' };
+                    }
+                    await h.refresh();
+                    return form.id === 'apspace-connect-setup' ? 'apspace-review-heading' : 'apspace-feedback';
+                });
+                return true;
+            }
             if (!['diet-form', 'class-form', 'ics-form', 'confirm-ics-form', 'scanner-input', 'scan-confirm', 'photo-form'].includes(form.id)) return false;
             const f = new FormData(form);
             void h.work(async () => {

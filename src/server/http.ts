@@ -33,11 +33,11 @@ async function body(req: IncomingMessage, limit = 32768): Promise<unknown> {
         throw new AppError(400, 'INVALID_JSON', 'Malformed JSON.');
     }
 }
-export function createApp(config: Settings, service: MealService, db?: LocalDatabase, notificationService?: PushService) {
+export function createApp(config: Settings, service: MealService, db?: LocalDatabase, notificationService?: PushService, productService?: ProductService) {
     const auth = new Auth(config);
     const push = notificationService ?? (db ? new PushService(db) : undefined);
     const accounts = db ? new Accounts(db, config.secureCookie) : undefined;
-    const product = db ? new ProductService(db) : undefined;
+    const product = productService ?? (db ? new ProductService(db) : undefined);
     const checkout = db ? new CheckoutService(db) : undefined;
     const authLimits = new Map<string, { count: number; until: number }>();
     const limits = new Map<string, {
@@ -110,7 +110,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
             requireThat(!config.mcpOnly, 'NOT_FOUND', 'This service exposes MCP only.', 404);
             if (pathname === '/api/push/config' && req.method === 'GET') { json(res, 200, push?.publicConfig() ?? { configured: false, publicKey: '' }); return; }
             if (pathname === '/api/config' && req.method === 'GET') {
-                json(res, 200, { mode: config.mode, firebaseApiKey: config.firebaseApiKey, enterpriseConfigured: !!config.agentAudience && Object.keys(config.agentEmails).length > 0, demoIdentities: config.mode === 'demo' ? DEMO_IDENTITIES : [] });
+                json(res, 200, { mode: config.mode, firebaseApiKey: config.firebaseApiKey, enterpriseConfigured: !!config.agentAudience && Object.keys(config.agentEmails).length > 0, demoIdentities: config.mode === 'demo' ? DEMO_IDENTITIES : [], apspaceConfigured: product?.apspaceConfigured ?? false });
                 return;
             }
             if (config.mode === 'local' && pathname === '/api/catalog' && req.method === 'GET') {
@@ -151,8 +151,13 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                     const route = pathname.slice('/api/product/'.length);
                     if (route === 'profile' && method === 'GET') { await product.tick(); json(res, 200, product.profile(actor)); return; }
                     if (route === 'loads' && method === 'GET') { json(res, 200, product.loads()); return; }
+                    if (route === 'timetable/apspace/options' && method === 'GET') { json(res, 200, await product.apspaceOptions(actor)); return; }
                     requireThat(method === 'POST', 'METHOD_NOT_ALLOWED', 'Use POST for this action.', 405);
-                    const input = object(await body(req, route === 'photo' ? 2900000 : route === 'timetable/preview' ? 300000 : route === 'timetable/confirm' ? 65536 : 32768));
+                    const bodyLimit = route === 'photo' ? 2900000
+                        : route === 'timetable/preview' ? 300000
+                        : route === 'timetable/confirm' ? 65536
+                        : route === 'timetable/apspace/confirm' ? 131072 : 32768;
+                    const input = object(await body(req, bodyLimit));
                     let result: unknown = { ok: true };
                     if (route === 'preferences') await product.preferences(actor, input);
                     else if (route === 'favourite') await product.favourite(actor, input);
@@ -163,6 +168,11 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                     else if (route === 'timetable/confirm') await product.confirmTimetable(actor, input);
                     else if (route === 'timetable/manual') await product.manualClass(actor, input);
                     else if (route === 'timetable/delete') await product.deleteClass(actor, input);
+                    else if (route === 'timetable/apspace/preview') result = await product.previewApspace(actor, input);
+                    else if (route === 'timetable/apspace/confirm') await product.confirmApspace(actor, input);
+                    else if (route === 'timetable/apspace/refresh') await product.refreshApspace(actor);
+                    else if (route === 'timetable/apspace/discard') await product.discardApspacePreview(actor, input);
+                    else if (route === 'timetable/apspace/disconnect') await product.disconnectApspace(actor);
                     else if (route === 'pickup/qr') result = await product.pickupQr(actor, String(input.vendorId ?? ''), String(input.orderId ?? ''));
                     else if (route === 'pickup/resolve') result = product.resolveQr(actor, input);
                     else if (route === 'pickup/collect') await product.collectQr(actor, input);
@@ -264,6 +274,8 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 filename = path.join(root, 'public/index.html');
             else if (/^\/(web|shared)\/[a-zA-Z0-9/_-]+\.(js|css)$/.test(pathname))
                 filename = path.join(root, pathname.slice(1));
+            else if (/^\/images\/(cafeterias|menu)\/[a-z0-9-]+\.jpg$/.test(pathname))
+                filename = path.join(root, 'public', pathname.slice(1));
             else if (['/favicon.svg', '/manifest.webmanifest', '/sw.js', '/icon-192.png', '/icon-512.png'].includes(pathname))
                 filename = path.join(root, 'public', pathname.slice(1));
             else
@@ -271,7 +283,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
             if (pathname === '/sw.js') res.setHeader('Service-Worker-Allowed', '/');
             const content = await readFile(filename).catch(() => { throw new AppError(404, 'NOT_FOUND', 'Build the application before starting the server.'); });
             const extension = path.extname(filename);
-            const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+            const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg' };
             res.writeHead(200, { 'Content-Type': types[extension] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
             res.end(req.method === 'HEAD' ? undefined : content);
         }

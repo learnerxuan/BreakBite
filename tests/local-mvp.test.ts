@@ -13,6 +13,7 @@ import { AppError } from '../src/server/errors.js';
 import { createApp } from '../src/server/http.js';
 import { settings } from '../src/server/config.js';
 import type { Actor, BasketGroup, PickupPlan } from '../src/shared/model.js';
+import { findTimetableBreaks, malaysiaDate, parseApspaceCalendar } from '../src/shared/timetable.js';
 const alex: Actor = { id: 'local-alex', name: 'Alex', role: 'student' };
 const sam: Actor = { id: 'local-sam', name: 'Sam', role: 'student' };
 const bowl: Actor = { id: 'op-bowl', name: 'Bowl operator', role: 'vendor', vendorId: 'bowl-lab' };
@@ -34,6 +35,53 @@ test('default configuration is real local accounts; public binding needs explici
 test('ordinary pickup has no class requirement; quotes add the combined total',async t=>{
     const f=await fixture(t);const q=await f.checkout.quote(alex,{groups:f.groups,plan:f.plan});
     assert.equal(q.groups.length,2);assert.equal(q.totalSen,1250);assert.equal(q.reasons.length,0);assert.ok(q.groups.every(g=>g.slots.length));
+});
+test('an APSpace-derived gap preserves checkout deadlines, atomic retries and single-use pickup', async t => {
+    const f = await fixture(t);
+    const now = Date.now();
+    const checkout = new CheckoutService(f.db, () => now);
+    const asIcs = (ms: number) => new Date(ms).toISOString().replace(/[-:]|\.\d{3}/g, '');
+    const event = (start: number, end: number) => ['BEGIN:VEVENT', 'SUMMARY:Synthetic class',
+        `DTSTART:${asIcs(start)}`, `DTEND:${asIcs(end)}`, 'END:VEVENT'].join('\n');
+    const date = malaysiaDate(new Date(now + 2 * 3600000).toISOString());
+    const midnight = Date.parse(`${date}T00:00:00+08:00`);
+    const firstEnd = Math.max(midnight + 60000, now - 60000);
+    const next = Math.max(now + 2 * 3600000, midnight + 3600000);
+    const input = ['BEGIN:VCALENDAR', 'VERSION:2.0', event(firstEnd - 3600000, firstEnd),
+        event(next, next + 3600000), 'END:VCALENDAR'].join('\n');
+    const { events } = parseApspaceCalendar(input);
+    const [gap] = findTimetableBreaks(events, date, now);
+    assert.ok(gap);
+    const plan = { breakStartAt: gap.startAt, nextClassAt: gap.endAt, budgetSen: 2500,
+        walkToMinutes: 0, eatMinutes: 5, returnMinutes: 2, bufferMinutes: 1 };
+    const q = await checkout.quote(alex, { groups: f.groups, plan });
+    const first = q.groups[0]!.slots[0]!;
+    const second = q.groups[1]!.slots.find(s => Date.parse(s.startAt) >= Date.parse(first.startAt) + 3 * 60000)!;
+    assert.ok(first && second);
+    const payload = { ...f.payload, groups: f.groups.map((g, i) => ({ ...g, slotId: i === 0 ? first.id : second.id })), plan };
+    const [c, retry] = await Promise.all([
+        checkout.submit(alex, payload, 'apspace-checkout'),
+        checkout.submit(alex, payload, 'apspace-checkout'),
+    ]);
+    assert.equal(c.orders.length, 2);
+    assert.ok(c.orders.every(o => 'nextClassAt' in o.plan && o.plan.nextClassAt === gap.endAt && o.latestPickupAt < gap.endAt));
+    assert.deepEqual(retry, c);
+    assert.equal(checkout.lookup(sam, 'apspace-checkout'), null);
+    const future = { ...payload, plan: { ...plan, nextClassAt: new Date(now + 86400001).toISOString() } };
+    await assert.rejects(checkout.quote(alex, future), isCode('INVALID_PLAN'));
+    await assert.rejects(checkout.submit(alex, future, 'apspace-outside-horizon'), isCode('INVALID_PLAN'));
+    await f.store.transact('noodle-co', state => { state.items.find(i => i.id === 'lemon-water')!.stock = 0; });
+    const before = f.db.read();
+    await assert.rejects(checkout.submit(alex, payload, 'apspace-sold-out'), isCode('NO_AVAILABLE_SLOT'));
+    assert.deepEqual(f.db.read(), before);
+
+    const order = c.orders.find(o => o.vendorId === bowl.vendorId)!;
+    await f.service.changeStatus(bowl, order.vendorId, order.id, { status: 'preparing' });
+    await f.service.changeStatus(bowl, order.vendorId, order.id, { status: 'ready' });
+    const handover = { code: order.pickupCode, paymentReceived: true };
+    await f.service.collect(bowl, order.vendorId, order.id, handover);
+    await assert.rejects(f.service.collect(bowl, order.vendorId, order.id, handover), isCode('NOT_READY'));
+    assert.equal(checkout.lookup(alex, 'apspace-checkout')!.orders.find(o => o.vendorId === noodle.vendorId)!.status, 'confirmed');
 });
 test('one checkout creates two scoped child orders with independent codes',async t=>{
     const f=await fixture(t);const c=await f.checkout.submit(alex,f.payload,'checkout-one');
@@ -154,7 +202,10 @@ async function httpFixture(t:test.TestContext){
 }
 test('HTTP local mode exposes a browsable catalog but no account switcher or demo login',async t=>{
     const f=await httpFixture(t);const c=await f.request('/api/config');assert.equal(c.data.mode,'local');assert.deepEqual(c.data.demoIdentities,[]);
-    assert.equal((await f.request('/api/catalog')).data.items.length,10);
+    const catalog=await f.request('/api/catalog');assert.equal(catalog.data.items.length,55);
+    const locations=Object.fromEntries(catalog.data.vendors.map((vendor:{id:string;location:string})=>[vendor.id,vendor.location]));
+    assert.equal(locations['asian-cuisine'],'Cafeteria (Level 3)');assert.equal(locations.nelson,'Atrium (Level 3)');assert.equal(locations.subway,'Above Centre Point (Level 5)');assert.equal(locations.bobanika,'Above Centre Point (Level 5)');
+    const sample=f.db.read().vendors['asian-cuisine']!.items[0]!;assert.match(sample.photoPath!,/^\/images\/menu\/[a-z0-9-]+\.jpg$/);assert.match(sample.photoCredit!,/AI-generated illustrative sample/);
     assert.equal((await f.request('/api/state')).status,401);
     assert.equal((await f.request('/api/demo/login','POST',{id:'student-alex'})).status,404);
 });

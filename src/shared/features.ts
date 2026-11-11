@@ -1,3 +1,5 @@
+import type { ApspaceConnection, ApspaceSource } from './model.js';
+
 /** Product contracts shared by the browser and the authoritative server. */
 export const ALLERGENS = ['peanuts', 'tree_nuts', 'milk', 'eggs', 'fish', 'shellfish', 'soy', 'sesame', 'wheat', 'gluten'] as const;
 export type Allergen = typeof ALLERGENS[number];
@@ -16,11 +18,24 @@ export interface FoodPreferences { diets: Diet[]; avoid: Allergen[]; hideUnsuita
 export interface SavedBasket {
     id: string; name: string; lines: { vendorId: string; itemId: string; quantity: number; name: string; priceSen: number; foodRevision?: string }[]; updatedAt: string;
 }
-export interface ClassEvent { id: string; uid: string; title: string; startAt: string; endAt: string; location: string; source: 'manual' | 'import'; }
+export interface ClassEvent { id: string; uid: string; title: string; startAt: string; endAt: string; location: string; source: 'manual' | 'import' | 'apspace'; }
 export interface TimetablePreview { id: string; events: ClassEvent[]; warnings: string[]; expiresAt: string; horizonEnd: string; }
+export interface ApspacePreview extends ApspaceSource {
+    id: string;
+    kind: 'connect' | 'update';
+    checkedAt: string;
+    expiresAt: string;
+    events: ClassEvent[];
+    affectedDates: string[];
+    selectedIds: string[];
+}
 export interface StudentProfile {
     favourites: string[]; usuals: SavedBasket[]; preferences: FoodPreferences;
     classes: ClassEvent[]; importedAt?: string; importHorizonEnd?: string; preview?: TimetablePreview;
+    apspace?: ApspaceConnection;
+    apspacePreview?: ApspacePreview;
+    apspaceGeneration?: string;
+    apspaceReviewed?: Record<string, string[]>;
 }
 export interface Notice { id: string; key: string; studentId: string; orderId: string; vendorId: string; message: string; at: string; readAt?: string; }
 export interface PickupPolicy { cutoffMinutes: number; cancellationMinutes: number; holdMinutes: number; delayGraceMinutes: number; }
@@ -30,6 +45,7 @@ export const label = (s: string): string => s.replaceAll('_', ' ');
 export interface FoodCheck { suitable: boolean; reasons: string[]; }
 export function foodCheck(info: FoodInfo | undefined, p: FoodPreferences, now = Date.now()): FoodCheck {
     const reasons: string[] = [];
+    if ((p.avoid.length || p.diets.length) && info?.reviewedBy === 'sample-seed') reasons.push('Vendor review is required for this sample dietary information.');
     const evidenceCurrent = (e?: Evidence) => !!e?.reference && /^\d{4}-\d{2}-\d{2}$/.test(e.expiresOn) && Date.parse(`${e.expiresOn}T23:59:59+08:00`) >= now;
     if (p.avoid.length && (!info?.allergensKnown || !info.ingredients.trim())) reasons.push('Ingredient/allergen information is incomplete.');
     for (const a of p.avoid) if (info?.allergens.includes(a) || info?.mayContain.includes(a)) reasons.push(`${label(a)} is declared or may be present.`);

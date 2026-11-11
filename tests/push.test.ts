@@ -19,6 +19,21 @@ import { createApp } from '../src/server/http.js';
 import { settings } from '../src/server/config.js';
 import { AppError } from '../src/server/errors.js';
 import type { Actor } from '../src/shared/model.js';
+
+test('generated VAPID keys retain the leading zero bytes of a P-256 scalar', t => {
+    const curve = createECDH('prime256v1');
+    const scalar = Buffer.alloc(32);
+    scalar[31] = 1;
+    curve.setPrivateKey(scalar);
+    t.mock.method(Object.getPrototypeOf(curve), 'generateKeys', function (this: typeof curve) {
+        this.setPrivateKey(scalar);
+        return this.getPublicKey();
+    });
+    const keys = generatePushKeys('mailto:operator@example.test');
+    assert.deepEqual(Buffer.from(keys.privateKey, 'base64url'), scalar);
+    assert.equal(keys.publicKey, curve.getPublicKey().toString('base64url'));
+});
+
 const op: Actor = { id:'op',name:'Kitchen',role:'vendor',vendorId:'bowl-lab' };
 const rejected = (code:string)=>(e:unknown)=>e instanceof AppError && e.code===code;
 function subscription(suffix='device') { const e=createECDH('prime256v1');e.generateKeys();return { endpoint:`https://fcm.googleapis.com/fcm/send/${suffix}`,keys:{p256dh:e.getPublicKey().toString('base64url'),auth:Buffer.alloc(16,23).toString('base64url')},privateKey:e.getPrivateKey() }; }

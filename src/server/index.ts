@@ -1,6 +1,7 @@
 import { loadPushKeys } from './web-push.js';
 import { PushService } from './push.js';
 import { ProductService } from './product.js';
+import { ApspaceTimetableProvider } from './apspace-timetable.js';
 import { settings } from './config.js';
 import { FileStore, FirestoreStore, type Store } from './store.js';
 import { LocalDatabase, LocalStore } from './local-database.js';
@@ -17,7 +18,8 @@ else {
     for (const id of VENDOR_IDS) await store.initialize(seedVendor(id));
 }
 const push = db ? new PushService(db, await loadPushKeys(config.dataDir)) : undefined;
-const product = db ? new ProductService(db) : undefined;
+const apspace = db && process.env.BREAKBITE_APSPACE === 'true' ? new ApspaceTimetableProvider() : undefined;
+const product = db ? new ProductService(db, Date.now, apspace) : undefined;
 const service = new MealService(store, Date.now, config.mode === 'local' ? 'pay_at_pickup' : 'simulated');
 // Rolling capacity windows use each operator's configured online allocation. They never reset reservations.
 let refreshing = false;
@@ -36,13 +38,22 @@ const reminderTimer = setInterval(() => { void product?.tick().catch(e => consol
 const timer = setInterval(() => { void refreshWindows().catch(e => console.error('Pickup schedule:', e.message)); }, 60000);
 timer.unref();
 const pushTimer = setInterval(() => { void push?.pump().catch(() => console.error('Push queue unavailable; inbox remains authoritative.')); }, 5000); pushTimer.unref();
-const server = createApp(config, service, db, push);
+let apspaceRefresh: Promise<void> | undefined;
+function refreshApspace(): void {
+    if (!product?.apspaceConfigured || apspaceRefresh) return;
+    apspaceRefresh = product.refreshApspace().catch(() => console.error('Could not save APSpace refresh status.'))
+        .finally(() => { apspaceRefresh = undefined; });
+}
+const apspaceTimer = apspace ? setInterval(refreshApspace, 60000) : undefined;
+apspaceTimer?.unref();
+const server = createApp(config, service, db, push, product);
 server.listen(config.port, config.host, () => console.log(`BreakBite · http://${config.host}:${config.port} · ${config.mode === 'local' ? 'JSON accounts and orders; pay at each counter' : config.mode + ' adapter'}\nOperator setup: stop the server, then run npm run operator`));
-server.on('error', async error => { console.error('Could not start server:', error.message); clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer); await push?.settle(); await db?.close(); process.exitCode = 1; });
+server.on('listening', refreshApspace);
+server.on('error', async error => { console.error('Could not start server:', error.message); clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer); clearInterval(apspaceTimer); await apspaceRefresh; await push?.settle(); await db?.close(); process.exitCode = 1; });
 let closing = false;
 const shutdown = () => {
-    if (closing) return; closing = true; clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer);
-    server.close(async () => { await push?.settle(); await db?.close(); process.exit(0); });
+    if (closing) return; closing = true; clearInterval(timer); clearInterval(reminderTimer); clearInterval(pushTimer); clearInterval(apspaceTimer);
+    server.close(async () => { await apspaceRefresh; await push?.settle(); await db?.close(); process.exit(0); });
     server.closeIdleConnections();
 };
 process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);

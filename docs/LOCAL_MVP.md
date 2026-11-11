@@ -17,12 +17,12 @@
 1. Run the application; browse the starter catalogue and register a student.
 2. Stop the server with Ctrl+C.
 3. Run `npm run operator`; enter a kitchen operator's name, email, kitchen ID and password.
-4. Repeat for `bowl-lab` and `noodle-co` as needed. Do not publish passwords in the repository.
+4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains the two original test kitchens and nine supplied-photo APU sample vendors. Do not publish passwords in the repository.
 5. Start again. Use separate browser profiles for the student and operators.
 6. Operators replace the sample menu information, prices, preparation times and pickup location in their workspace.
 7. Operators confirm the menu has been reviewed in Kitchen settings; this removes that kitchen's sample label. This is operator acknowledgement, not independent verification.
 
-Starter allergen information is unknown. Operators can now supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
+The added project-purpose menus contain sample ingredients, spice levels, warnings and AI-generated illustrative dish images, but are not vendor-confirmed. Supplied restaurant photographs are kept separately for future kitchen banners and are not presented as dish photos. Active dietary restrictions treat seed information as unreviewed. Operators can supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
 
 ## Main flow
 
@@ -33,6 +33,28 @@ Starter allergen information is unknown. Operators can now supply reviewed ingre
 - View the checkout in My orders, with an individual status/code/amount for each kitchen.
 - Kitchens prepare independently. The student pays each counter separately; the operator scans the student's QR or enters the fallback code, then confirms payment received and handover.
 - Cancel each child independently before preparation and its agreed cancellation cutoff. Qualifying vendor delays allow an exception without a no-show penalty. No online charge/refund is performed.
+
+## Use a break from APSpace
+
+For a qualified local pilot, set `BREAKBITE_APSPACE=true` in `.env` and restart. In **My planner**, choose **Connect APSpace timetable**, type the intake code shown in APSpace, choose the group, then review and confirm your classes. BreakBite saves the selection and timetable to your account. **Fit my break** shows the next confirmed gap and checks live pickup times when the basket contains food.
+
+The running server checks the source about every six hours when there are connected accounts. **Refresh now** can check sooner. Review changed classes before using affected dates. My planner shows the last successful check and date coverage. A failed check keeps the saved classes and hides affected suggestions. **Disconnect APSpace** removes the connection and its classes. Manually entered and file-imported classes are kept.
+
+The pilot uses a public intake timetable snapshot. Use the actual APSpace timetable to verify your classes. The publication schedule and terms for shared deployment are still being qualified. Automatic import is off by default. The saved **Import an .ics timetable** option in My planner is available as a fallback. Saved classes are also available in the basket.
+
+### Import a file for the current tab
+
+When automatic import is off, the basket also offers a file import that stays in the current tab.
+
+1. Open **Timetable** in APSpace. Select your **Intake**, the date for the intended week and your group when available. Press the calendar icon to download the `.ics` file.
+2. Sign in to BreakBite. In your basket, turn on **Fit my break** and choose the file under **Import APSpace timetable**.
+3. Check the dates, Malaysia times and overlaps. Untick classes that do not apply, confirm that the selection applies to you, then choose **Use selected classes**.
+4. Select a date and choose **Use this break**. Review the time and budget fields, then choose pickup times to check live availability. A gap describes free time between included classes. The next commitment must be within 24 hours to apply it.
+
+- Fit my break accepts UTF-8, version 2.0 `.ics` exports with dated UTC start and end times, up to 256 KiB and 500 entries. Recurrence, all-day events, local times and calendar updates require manual time entry.
+- The import timestamp shows when the file was read. Export again when classes change. **Replace timetable** opens a fresh preview. Cancelling or a failed file preserves the prior timetable. Confirming a replacement or removing the timetable clears any break still linked to it.
+- This import stays in the current browser tab and clears on refresh or sign-out. Checkout sends the selected break times and ordinary plan fields. **My planner** is the separate saved calendar feature.
+- You can enter times manually in Fit my break or turn it off for ordinary ordering.
 
 ## Delay and recovery
 
@@ -112,7 +134,7 @@ COOKIE_SECURE=false
 
 - Upgrade preserves v0.2 accounts/orders; new profile/notice fields are added as used. Back up before upgrading.
 - Camera scanning requires HTTPS and a supported native QR detector. HTTP LAN browsing is not a camera acceptance test. Manual code and USB-scanner text remain usable.
-- Reminders are created by the running server every 15 seconds, independently of browser activity. Read the durable Inbox; device notifications only work while the site is open with permission.
+- Reminders are created by the running server every 15 seconds, independently of browser activity. Read the durable Inbox; background Web Push requires explicit opt-in and installation setup. Real device delivery remains unverified.
 - Ready too early does not shorten the booked grace period. Overdue food is not restocked automatically; merchants must confirm an uncollected closure.
 - Save preferences, favourites/usual orders and optional timetables through the student pages. Imported calendars are private snapshots, not APSpace live sync.
 - Photos are saved locally in `.data/media/`. The source repository must never contain private data or unauthorised photographs.
