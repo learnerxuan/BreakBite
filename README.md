@@ -69,7 +69,7 @@ npm start
 
 ## Real campus data
 
-- The starter catalogue includes nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus and ingredients remain labelled sample content until reviewed.
+- The starter catalogue includes nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus, ingredients and illustrative images remain sample data until reviewed; visible card badges are hidden at the project owner's request.
 - Operators can replace menus, upload owned/licensed photographs, record the review source and confirm their kitchen data.
 - Do not remove sample labels merely to imply deployment. Obtain actual vendor confirmation first.
 - No fabricated nutrition, halal certification, allergy guarantees, time-saving percentage or university endorsement.

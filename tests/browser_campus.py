@@ -43,7 +43,7 @@ with sync_playwright() as playwright:
     expect(photos).to_have_count(45)
     page.locator('#kitchen-filter').select_option('asian-cuisine')
     expect(page.locator('.bb-meal')).to_have_count(5)
-    expect(page.locator('.bb-kitchen-name').first).to_contain_text('Sample menu')
+    expect(page.locator('.bb-kitchen-name').first).not_to_contain_text('Sample menu')
     page.locator('#kitchen-filter').select_option('all')
 
     login(page, f'campus-{uuid4().hex[:8]}@example.test', register=True)

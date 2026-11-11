@@ -36,7 +36,7 @@ with sync_playwright() as p:
     login(kitchen,'operator.bowl@example.test')
     kitchen.get_by_role('button',name='Menu & stock',exact=True).click()
     expect(kitchen.get_by_text('This is a sample menu.',exact=False)).to_have_count(0)
-    expect(kitchen.get_by_text('Sample menu',exact=False)).to_be_visible()
+    expect(kitchen.get_by_text('Sample menu',exact=False)).to_have_count(0)
     kitchen.get_by_role('button',name='Order history',exact=True).click()
     expect(kitchen.get_by_text('No finished orders yet.',exact=True)).to_be_visible()
     kitchen.get_by_role('button',name='Close kitchen',exact=True).click()
