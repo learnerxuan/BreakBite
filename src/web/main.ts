@@ -380,7 +380,7 @@ root.addEventListener('submit',event=>{
 async function boot(): Promise<void> {
     try {
         s.config=await api<AppConfig>('/api/config');
-        if(s.config.mode!=='local')throw new Error('This release uses AUTH_MODE=local and JSON storage. Cloud and Enterprise migration is deferred; see docs/LOCAL_MVP.md.');
+        if(s.config.mode!=='local')throw new Error('Use AUTH_MODE=local for this product UI. Configure file or Firestore storage separately; see docs/FIRESTORE.md.');
         setActor(await restore());if(s.actor?.role==='vendor')s.view='vendor';else if(new URLSearchParams(location.search).get('view')==='inbox'){s.view=s.actor?'inbox':'explore';if(!s.actor)s.auth='login';}await refresh();await refreshPush(s.actor);
         if(attempt&&attempt.actorId===s.actor?.id){const prior=await api<{checkout:CheckoutResult|null}>(`/api/checkouts/${encodeURIComponent(attempt.key)}`);if(prior.checkout){confirmed(prior.checkout);await refresh();}else s.uncertain=true;}
         render();

@@ -9,7 +9,7 @@
 - Source checkout: `npm install`, `npm run check`, `npm start`.
 - Prebuilt package: `npm start`.
 - Open `http://127.0.0.1:8080` in a normal browser.
-- Default mode is `AUTH_MODE=local`, with JSON storage and real account authentication.
+- Default mode is `AUTH_MODE=local`, with JSON storage and real account authentication. Optional Firestore storage uses the same accounts/API; see [FIRESTORE.md](FIRESTORE.md). New Firestore roots do not import local accounts/orders.
 - An old `.env` containing `AUTH_MODE=demo` must be updated. Demo impersonation remains a legacy test harness, not the product UI.
 
 ## First usable installation
@@ -20,7 +20,7 @@
 4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains nine supplied-photo APU sample vendors. Bowl Lab and Noodle & Co. are retired; existing orders are preserved. Do not publish passwords in the repository.
 5. Start again. Use separate browser profiles for the student and operators.
 6. Operators replace the sample menu information, prices, preparation times and pickup location in their workspace.
-7. Operators confirm the menu has been reviewed in Kitchen settings; this removes that kitchen's sample label. This is operator acknowledgement, not independent verification.
+7. Operators confirm the menu has been reviewed in Kitchen settings. This updates stored review status; hidden card badges do not imply review or independent verification.
 
 The added project-purpose menus contain sample ingredients, spice levels, warnings and AI-generated illustrative dish images, but are not vendor-confirmed. Supplied restaurant photographs are kept separately for future kitchen banners and are not presented as dish photos. Active dietary restrictions treat seed information as unreviewed. Operators can supply reviewed ingredients, allergens, dietary declarations and evidence. Unknown is not allergen-free; do not invent certification claims. See [v0.3 guide](RELEASE_0_3.md).
 

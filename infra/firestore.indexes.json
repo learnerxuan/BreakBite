@@ -1,10 +1,16 @@
 {
   "indexes": [],
   "fieldOverrides": [
-    {
-      "collectionGroup": "vendorStates",
-      "fieldPath": "payload",
-      "indexes": []
-    }
+    { "collectionGroup": "vendorStates", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "accounts", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "sessions", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "checkouts", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "profiles", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "notices", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "pushDevices", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "pushJobs", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "vendors", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "orders", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "requests", "fieldPath": "payload", "indexes": [] }
   ]
 }

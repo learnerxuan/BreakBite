@@ -6,7 +6,7 @@ import { emptyProfile, foodCheck, isClosed, type ApspacePreview, type ClassEvent
 import { malaysiaDate } from '../shared/timetable.js';
 import { preparationSavings, type SavingsSummary } from '../shared/savings.js';
 import type { ApspaceProvider, ApspaceSnapshot } from './apspace-timetable.js';
-import { LocalDatabase, DraftStore, assertPickupItinerary, type LocalData } from './local-database.js';
+import { DraftStore, assertPickupItinerary, type Database, type LocalData } from './local-database.js';
 import { MealService, safeOrder, parseSelections } from './domain.js';
 import { integer, iso, object, requireThat, text } from './errors.js';
 import { parsePreferences, foodRevision } from './food.js';
@@ -75,7 +75,7 @@ function itinerary(d: LocalData, o: Order): void {
     assertPickupItinerary(windows, checkout.transferMinutes ?? 2);
 }
 export class ProductService {
-    constructor(readonly db: LocalDatabase, private clock = Date.now, private apspaceProvider?: ApspaceProvider) {}
+    constructor(readonly db: Database, private clock = Date.now, private apspaceProvider?: ApspaceProvider) {}
     get apspaceConfigured(): boolean { return Boolean(this.apspaceProvider); }
     profile(a: Actor): { profile: StudentProfile; notices: Notice[]; savings: SavingsSummary } {
         const d = this.db.read(); const p = profile(d, a);

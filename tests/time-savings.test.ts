@@ -1,10 +1,11 @@
+import { testDatabase } from './support/test-database.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { estimatedPreparationSavedMinutes, preparationSavings, type SavingsOrder } from '../src/shared/savings.js';
-import { LocalDatabase, LocalStore } from '../src/server/local-database.js';
+import { LocalStore } from '../src/server/local-database.js';
 import { CheckoutService } from '../src/server/checkout.js';
 import { MealService } from '../src/server/domain.js';
 import { ProductService } from '../src/server/product.js';
@@ -46,7 +47,7 @@ test('a replacement can earn only the lead time since it was accepted', () => {
 });
 test('the server snapshots menu estimates, credits collection once and preserves totals across restart', async t => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'breakbite-savings-'));
-    const db = new LocalDatabase(dir); await db.open();
+    const db = testDatabase(dir); await db.open();
     t.after(async () => { await db.close(); await rm(dir, { recursive: true, force: true }); });
     let now = Date.now(); const clock = () => now;
     const service = new MealService(new LocalStore(db), clock, 'pay_at_pickup');
@@ -90,7 +91,7 @@ test('the impact display is prominent, explicitly estimated and never promises m
 });
 test('accepted replacements reset the saved preparation baseline and its effective order time', async t => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'breakbite-savings-replacement-'));
-    const db = new LocalDatabase(dir); await db.open();
+    const db = testDatabase(dir); await db.open();
     t.after(async () => { await db.close(); await rm(dir, { recursive: true, force: true }); });
     let now = Date.now(); const clock = () => now;
     const service = new MealService(new LocalStore(db), clock, 'pay_at_pickup');

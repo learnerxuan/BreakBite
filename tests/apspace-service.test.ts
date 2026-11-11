@@ -10,7 +10,8 @@ import { settings } from '../src/server/config.js';
 import { MealService } from '../src/server/domain.js';
 import { AppError } from '../src/server/errors.js';
 import { createApp } from '../src/server/http.js';
-import { LocalDatabase, LocalStore } from '../src/server/local-database.js';
+import { LocalStore } from '../src/server/local-database.js';
+import { testDatabase } from './support/test-database.js';
 import { ProductService } from '../src/server/product.js';
 import type { Actor } from '../src/shared/model.js';
 
@@ -31,7 +32,7 @@ function row(title: string, time: string, end: string, date = day, group = 'G1')
 const before = [row('Morning', '09:00', '10:00'), row('Afternoon', '14:00', '15:00'), row('Tomorrow', '09:00', '10:00', nextDay)];
 async function fixture(t: test.TestContext) {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'breakbite-apspace-'));
-    const db = new LocalDatabase(directory);
+    const db = testDatabase(directory);
     await db.open();
     t.after(async () => { await db.close(); await rm(directory, { recursive: true, force: true }); });
     let now = Date.parse(`${day}T08:00:00+08:00`);
@@ -71,7 +72,7 @@ test('confirmed APSpace classes persist privately and coexist with file and manu
     const preview = await product.previewApspace(owner, selection);
     await product.confirmApspace(owner, { previewId: preview.id, ids: preview.selectedIds, consent: true });
     await db.close();
-    const reopened = new LocalDatabase(directory);
+    const reopened = testDatabase(directory);
     await reopened.open();
     try {
         const persisted = new ProductService(reopened, () => Date.parse(snapshot().checkedAt), { get: async () => snapshot() });
