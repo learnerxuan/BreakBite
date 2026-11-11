@@ -1,3 +1,14 @@
+# Combined branch verification — 11 November 2026
+
+- Integrated `codex/apspace-timetable` (`729a91c`) and `leeminhao-branch` (`f579d43`) from `982d766`. Resolved shared state, basket and CSS conflicts while preserving both workflows.
+- `npm run check` passed strict TypeScript checking, **160 tests with zero failures**, and the production build. On this Windows shell, set `$env:npm_config_script_shell = (Get-Command pwsh).Source` first so nested npm calls resolve.
+- Added migration regressions for existing child orders and retry records, reviewed operator data, sample dietary restrictions and the combined basket. A failing regression demonstrated that the original migration overwrote reviewed locations/photos; the migration now changes only unreviewed sample placeholders.
+- All five Playwright suites passed over normal localhost HTTP in Chrome using disposable data: `browser_product.py`, `browser_v3.py`, `browser_apspace.py`, `browser_notifications.py` and the new `browser_campus.py`. Pass `--base-url <fixture URL> --chromium <Chrome executable>` to each. Use `setup-browser.mjs` for ordinary fixture accounts and `setup-apspace-browser.mjs` for the synthetic APSpace server.
+- Coverage includes atomic multi-kitchen checkout, lost-response recovery, independent cancellation, consent-based replacement, QR decoding/handover/replay, saved meals, timetable confirmation/refresh, all 45 bundled dish JPEGs, sample labels, allergy filters, and layouts at 360/390/768/1440px. No uncaught browser JavaScript errors were reported.
+- Run browser suites on separate disposable servers or sequentially: an overlapping run hit the existing per-IP request limit. The isolated rerun passed. An obsolete 10-card expectation was updated for the 55-item catalogue.
+- A direct `ApspaceTimetableProvider.get()` smoke check successfully fetched and normalized the public source with 1,143 intake options. This verifies current source access, not personal-account linkage, completeness or publication cadence.
+- Remaining gaps: physical phone camera, deployed HTTPS, real closed-tab push delivery, full accessibility/security/load audits, public hosting and Google/Gemini integration. Sample menus remain unverified vendor data. No live APSpace account sync is claimed.
+
 # Automatic APSpace import verification — 9 November 2026
 
 - `npm run check` passed strict type checking, all 156 automated tests and the production build. APSpace tests cover source validation, shared caching and retry backoff, session ownership and consent, update review, missing dates, disconnect races and saved gap rendering.

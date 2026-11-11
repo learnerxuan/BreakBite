@@ -274,6 +274,8 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 filename = path.join(root, 'public/index.html');
             else if (/^\/(web|shared)\/[a-zA-Z0-9/_-]+\.(js|css)$/.test(pathname))
                 filename = path.join(root, pathname.slice(1));
+            else if (/^\/images\/(cafeterias|menu)\/[a-z0-9-]+\.jpg$/.test(pathname))
+                filename = path.join(root, 'public', pathname.slice(1));
             else if (['/favicon.svg', '/manifest.webmanifest', '/sw.js', '/icon-192.png', '/icon-512.png'].includes(pathname))
                 filename = path.join(root, 'public', pathname.slice(1));
             else
@@ -281,7 +283,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
             if (pathname === '/sw.js') res.setHeader('Service-Worker-Allowed', '/');
             const content = await readFile(filename).catch(() => { throw new AppError(404, 'NOT_FOUND', 'Build the application before starting the server.'); });
             const extension = path.extname(filename);
-            const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+            const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg' };
             res.writeHead(200, { 'Content-Type': types[extension] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
             res.end(req.method === 'HEAD' ? undefined : content);
         }

@@ -213,7 +213,7 @@ with sync_playwright() as p:
     errors=[]
     def page(width=1440,height=1000):
         ctx=b.new_context(viewport={'width':width,'height':height});pg=ctx.new_page();pg.set_default_timeout(12000);pg.on('pageerror',lambda e:errors.append(str(e)));pg.on('dialog',lambda d:d.accept());boot(pg);return pg
-    student=page();expect(student.locator('.bb-meal')).to_have_count(10)
+    student=page();expect(student.locator('.bb-meal')).to_have_count(55)
     assert 'Local Demo Only' not in student.locator('body').inner_text();assert student.locator('input[name=nextClassAt]').count()==0
     overflow(student);student.screenshot(path=str(OUT/'home-desktop.png'),full_page=True)
     student.get_by_role('button',name='Add Golden chicken rice',exact=True).click();student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()

@@ -55,7 +55,7 @@
 - Ready captures actual time. Grace ends at max(actual Ready, booked window end) + agreed hold duration.
 - A server timer runs every 15 seconds and creates deduplicated private inbox notices. Late/overdue state does not depend on a student leaving the website open.
 - Overdue orders remain collectable until a merchant closes them with a reason. No automatic bans/fees, inventory restoration or retroactive capacity release.
-- Browser notifications work only with an open site and permission. Background push/email/SMS is not implemented.
+- Opt-in background Web Push uses a durable queue and a push-only service worker. Real closed-tab device delivery remains unverified; email/SMS are not implemented.
 
 ## Availability and earlier assistance
 

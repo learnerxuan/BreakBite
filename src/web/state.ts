@@ -1,4 +1,4 @@
-import type { StudentProfile, Notice, BookingLoad } from '../shared/features.js';
+import type { Allergen, StudentProfile, Notice, BookingLoad } from '../shared/features.js';
 import { emptyProfile } from '../shared/features.js';
 import type { Actor, AppConfig, BasketQuote, BreakPlan, MenuItem, RecoveryOption, Snapshot, TimetableBreak, TimetableImport, Vendor } from '../shared/model.js';
 export interface CartLine { vendorId: string; itemId: string; quantity: number; }
@@ -38,7 +38,7 @@ export interface ViewState {
     config: AppConfig | null; actor: Actor | null; snapshot: Snapshot | null;
     vendors: Vendor[]; items: MenuItem[]; cart: CartLine[];
     view: 'explore' | 'availability' | 'orders' | 'vendor' | 'saved' | 'planner' | 'inbox'; vendorTab: 'queue' | 'menu' | 'recovery' | 'settings';
-    search: string; category: string; vendorFilter: string;
+    search: string; category: string; vendorFilter: string; allergenFilters: Allergen[];
     fitBreak: boolean; plan: BreakPlan; quote: BasketQuote | null; chosen: Record<string, string>;
     timetable: TimetableState; planDraft: Record<string, string>; manualPlan: boolean;
     serverClock: { time: number; sampledAt: number } | null;
@@ -50,7 +50,7 @@ export interface ViewState {
 export function initialState(): ViewState {
     let cart: CartLine[] = [];
     try { const c: unknown = JSON.parse(sessionStorage.getItem('breakbite-cart-v2') ?? '[]'); if (Array.isArray(c) && c.length <= 25) cart = c.filter(x => x && typeof x.itemId === 'string' && typeof x.vendorId === 'string' && Number.isInteger(x.quantity) && x.quantity > 0 && x.quantity <= 5); } catch { /* Ignore an invalid client cache; the server validates everything. */ }
-    return { profile: emptyProfile(), notices: [], loads: [], detailItem: null, qr: null, scanner: false, scanResult: null, scanPayload: "", basketMessages: [], earlier: {}, config: null, actor: null, snapshot: null, vendors: [], items: [], cart, view: 'explore', vendorTab: 'queue', search: '', category: 'All', vendorFilter: 'all', fitBreak: false,
+    return { profile: emptyProfile(), notices: [], loads: [], detailItem: null, qr: null, scanner: false, scanResult: null, scanPayload: "", basketMessages: [], earlier: {}, config: null, actor: null, snapshot: null, vendors: [], items: [], cart, view: 'explore', vendorTab: 'queue', search: '', category: 'All', vendorFilter: 'all', allergenFilters: [], fitBreak: false,
         plan: defaultBreakPlan(), planDraft: {}, manualPlan: false, timetable: emptyTimetable(), serverClock: null,
         quote: null, chosen: {}, transferMinutes: 2, busy: false, offline: false, auth: null, authError: '', editing: null, recovery: {}, checkoutError: '', success: '', uncertain: false };
 }

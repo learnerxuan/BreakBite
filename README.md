@@ -20,7 +20,7 @@ npm start
 ```
 
 - Open `http://127.0.0.1:8080`.
-- `npm run operator` creates a kitchen account. Choose `bowl-lab` or `noodle-co`; run it while the server is stopped.
+- `npm run operator` creates a kitchen account. The prompt lists all available kitchen IDs; run it while the server is stopped.
 - Students register on the website. Kitchen roles cannot be self-selected.
 - Existing installations: keep `AUTH_MODE=local` and `STORE=file`; back up `.data/` before upgrading.
 - The ready-to-run archive includes `dist/`, so `npm start` and `npm run operator` work without installing build tools.
@@ -68,7 +68,7 @@ npm start
 
 ## Real campus data
 
-- Starter kitchens, menus and illustrations are labelled sample content, not verified APU vendors.
+- The starter catalogue includes the two original test kitchens plus nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus and ingredients remain labelled sample content until reviewed.
 - Operators can replace menus, upload owned/licensed photographs, record the review source and confirm their kitchen data.
 - Do not remove sample labels merely to imply deployment. Obtain actual vendor confirmation first.
 - No fabricated nutrition, halal certification, allergy guarantees, time-saving percentage or university endorsement.
@@ -103,9 +103,9 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm
 
 ## Verification and guides
 
-- `npm run check`: type checking, **156 automated tests**, production build.
-- Original and v0.3 browser journeys passed in an isolated renderer/local-API bridge at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
-- Actual phone camera, normal browser networking/TLS, real Google accounts and public deployment are not claimed tested.
+- `npm run check`: type checking, **160 automated tests**, production build.
+- Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
+- Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)
 - [v0.3 features and review guide](docs/RELEASE_0_3.md)
 - [Test results and limitations](docs/TEST_REPORT.md)
