@@ -127,6 +127,7 @@ async function refresh(): Promise<void> {
         }
     }
     if(s.view==='inbox') await refreshPush(s.actor);
+    if(s.vendorFilter!=='all'&&!s.vendors.some(v=>v.id===s.vendorFilter&&v.open&&!v.archived))s.vendorFilter='all';
     s.offline=false;
 }
 function authDialog(): string {
@@ -137,6 +138,7 @@ function authDialog(): string {
 function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
+    const openLoads = new Set([...root.querySelectorAll<HTMLDetailsElement>('details[data-load-vendor][open]')].map(el=>el.dataset.loadVendor));
     const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
     if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
     if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
@@ -155,6 +157,7 @@ function render(): void {
     const modal = root.querySelector('dialog[open]');
     if(focusId){const el=document.getElementById(focusId) as HTMLInputElement|null;if(el && (!modal || modal.contains(el))){el.focus({preventScroll:true});if(selection!==null&&selection!==undefined)try{el.setSelectionRange(selection,selection);}catch{/* Non-text input. */}}}
     const scrollAfter = root.querySelector<HTMLElement>('.bb-basket-scroll');
+    root.querySelectorAll<HTMLDetailsElement>('details[data-load-vendor]').forEach(el=>{el.open=openLoads.has(el.dataset.loadVendor);});
     if (scrollAfter && s.mobileBasketOpen) scrollAfter.scrollTop = basketScrollTop;
 }
 async function work(fn: ()=>Promise<void>): Promise<void> {
@@ -310,7 +313,7 @@ root.addEventListener('click',event=>{
             await api(vendorPath(`orders/${encodeURIComponent(id)}/cancel`,vid),'POST',{});await refresh();notify('Kitchen order cancelled. No online payment was taken.');
         }
         else if(action==='status'){await api(vendorPath(`orders/${encodeURIComponent(id)}/status`),'POST',{status:target.dataset.status});await refresh();}
-        else if(action==='toggle-open'){const v=s.vendors.find(v=>v.id===vid)!;await api(vendorPath('open'),'PATCH',{open:!v.open});await refresh();}
+        else if(action==='toggle-open'){const v=s.vendors.find(v=>v.id===vid)!;await api(vendorPath('open'),'PATCH',{open:!v.open});await refresh();notify(v.open?'Kitchen closed. Food is hidden from student menus; existing orders remain active.':'Kitchen reopened. Food is visible on student menus.');}
         else if(action==='toggle-item'){const i=s.items.find(i=>i.id===id&&i.vendorId===vid)!;await api(vendorPath(`items/${encodeURIComponent(id)}`),'PATCH',{enabled:!i.enabled});await refresh();}
         else if(action==='resolve'){await api(vendorPath(`incidents/${encodeURIComponent(id)}/resolve`),'POST',{});s.recovery={};await refresh();}
         else if(action==='evaluate'){s.recovery[id]=await api<{options:RecoveryOption[];message:string}>(vendorPath('recovery/evaluate'),'POST',{orderId:id});}

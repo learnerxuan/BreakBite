@@ -24,7 +24,7 @@ with sync_playwright() as pw:
         student = page(); expect(student.locator('.bb-meal')).not_to_have_count(0)
         expect(student.locator('.bb-loads')).to_have_count(0)
         student.get_by_role('button', name='Availability', exact=True).click()
-        expect(student.get_by_text('Online bookings, not the physical queue', exact=True)).to_be_visible()
+        expect(student.get_by_text('Online pickup capacity · MYT', exact=True)).to_be_visible()
         student.get_by_role('button', name='Explore', exact=True).click()
         expect(student.locator('.bb-loads')).to_have_count(0)
         student.screenshot(path=str(OUT / 'home-desktop.png'), full_page=True)

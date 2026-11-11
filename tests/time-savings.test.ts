@@ -83,7 +83,7 @@ test('the impact display is prominent, explicitly estimated and never promises m
     const html = explore(state);
     assert.match(html, /aria-label="Your estimated time saved"/);
     assert.match(html, /16/);
-    assert.match(html, /Estimated preparation wait avoided/);
+    assert.match(html, /Estimated food waiting time saved/);
     assert.match(html, /How is this estimated/);
     assert.match(html, /queue|walking/);
     assert.ok(html.indexOf('Your estimated time saved') < html.indexOf('Explore the menu'));

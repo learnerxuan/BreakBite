@@ -225,7 +225,7 @@ with sync_playwright() as p:
     student.get_by_role('button',name='Confirm all kitchen orders',exact=True).click();expect(student.locator('.bb-order')).to_have_count(2)
     codes=student.locator('.bb-pickup-code strong').all_inner_texts();assert len(set(codes))==2
     student.screenshot(path=str(OUT/'orders-desktop.png'),full_page=True)
-    op=page();login(op,'operator.bowl@example.test');expect(op.locator('[data-vendor-tab]')).to_have_count(4)
+    op=page();login(op,'operator.bowl@example.test');expect(op.locator('[data-vendor-tab]')).to_have_count(5)
     assert not any(c in op.locator('body').inner_text() for c in codes)
     expect(op.locator('.bb-order-grid').first.locator('.bb-order')).not_to_have_count(0)
     op.get_by_role('button',name='Delays & recovery').click();op.locator('#incident-form select').select_option('nasi-lemak');op.locator('#incident-form textarea').fill('Preparation unexpectedly delayed');op.locator('#incident-form input[type=number]').fill('20');op.get_by_role('button',name='Update affected orders').click()

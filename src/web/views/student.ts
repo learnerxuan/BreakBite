@@ -47,7 +47,7 @@ export function basket(s: ViewState): string {
     return mobileBasket() && s.mobileBasketOpen ? `<dialog id="mobile-basket-dialog" class="bb-mobile-basket" aria-labelledby="basket-title">${content}</dialog>` : content;
 }
 export function explore(s: ViewState): string {
-    const activeVendors = s.vendors.filter(v => !v.archived);
+    const activeVendors = s.vendors.filter(v => !v.archived && v.open);
     const activeIds = new Set(activeVendors.map(v => v.id));
     const allergyPreferences = { diets: [], avoid: s.allergenFilters, hideUnsuitable: true };
     const filtered = s.items.filter(i=> activeIds.has(i.vendorId) && (s.vendorFilter==='all'||s.vendorFilter===i.vendorId) && (s.category==='All'||s.category===i.category) && `${i.name} ${i.description}`.toLowerCase().includes(s.search.toLowerCase()) && (!s.allergenFilters.length || foodCheck(i.foodInfo,allergyPreferences).suitable) && (!s.profile.preferences.hideUnsuitable || foodCheck(i.foodInfo,s.profile.preferences).suitable));

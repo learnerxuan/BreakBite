@@ -1,3 +1,12 @@
+# Kitchen history, closure and pickup summaries — 11 November 2026
+
+- Removed the requested long sample-menu warning from Menu & stock while retaining concise sample identification and the review controls. Added Order history next to Order queue, showing own-kitchen collected/cancelled/uncollected orders, amounts and dated updates, newest first.
+- Close kitchen/Reopen kitchen uses the existing persisted open state. Closed-kitchen food is hidden in Explore, favourites and recent menu shortcuts; stale kitchen filters reset. Existing carts/retry payloads and existing orders are preserved, and backend quote rejection remains authoritative.
+- Availability now starts with up to three actual bookable pickup ranges and expandable slot detail. Range grouping preserves full, closed and missing gaps; it does not invent operating hours. Open slot detail survives polling.
+- `npm run check` passed TypeScript, **174 automated tests** and the production build. A new range regression covers sorting, continuity/gaps and non-mutation. Updated a stale savings-heading assertion to match the previously requested food-wait wording.
+- `python tests/browser_kitchen.py --base-url http://127.0.0.1:8113 --chromium <Chrome executable>` passed over real localhost HTTP with disposable data: closure persists after reload, student menus/favourites update, closed kitchens reject quotes, existing orders can still be collected, histories are isolated and persistent, and layouts work at 360/390/768/1440px. Mobile screenshots were visually inspected.
+- `browser_product.py`, `browser_v3.py` and `browser_notifications.py` passed on disposable local servers with the same normal-HTTP/Chrome flags, covering atomic checkout/recovery, independent QR decoding/payment-confirmed handover, dietary/timetable flows and separate Availability. Old expectations for four kitchen tabs and the availability subtitle were updated for the requested UI. Localhost serves the updated assets; the LAN URL returned HTTP 200. Physical-device testing remains unverified.
+
 # Food waiting focus — 11 November 2026
 
 - Removed walking/return/buffer form controls and their deductions from new browser plans; legacy contract fields use zero. Historical plans and uncertain checkout payloads are preserved. The savings heading now says “Estimated food waiting time saved”; its preparation/readiness/lead-time calculation is unchanged.
