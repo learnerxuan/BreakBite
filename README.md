@@ -39,6 +39,7 @@ npm start
 | Collection policies | Configurable ordering/cancellation cutoffs, snapshotted order rules, server-generated ready/due/overdue reminders, merchant-confirmed uncollected closure and corrections. |
 | Timetable | Manual classes and `.ics` imports, plus opt-in APSpace import by typed intake code and group. Review classes once, then use saved gaps in the planner or basket. Changes require review. |
 | Deadline help | Move a not-yet-preparing order into genuinely free earlier capacity, or request reviewed alternatives. Other students are never pushed back. |
+| Time saved | Prominent, private estimate of preparation wait avoided on collected checkouts; snapshotted preparation times, lateness adjustment and no double counting across parallel kitchens. |
 | Kitchen operations | Menu/stock editing, preparation queue, pause/reopen, capacity settings, delays, consent-based alternatives, collection and operation history. |
 
 ## Important workflow rules
@@ -68,10 +69,18 @@ npm start
 
 ## Real campus data
 
-- The starter catalogue includes the two original test kitchens plus nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus and ingredients remain labelled sample content until reviewed.
+- The starter catalogue includes nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus and ingredients remain labelled sample content until reviewed.
 - Operators can replace menus, upload owned/licensed photographs, record the review source and confirm their kitchen data.
 - Do not remove sample labels merely to imply deployment. Obtain actual vendor confirmation first.
 - No fabricated nutrition, halal certification, allergy guarantees, time-saving percentage or university endorsement.
+
+## Estimated time saved
+
+- Explore and My orders show your estimated preparation wait avoided, counted only after collection. The basket previews the potential estimate.
+- Per kitchen: preparation minutes saved at checkout minus readiness lateness after the booked pickup start, capped at the order-ahead lead time and rounded down. A replacement starts its lead time when accepted.
+- Each checkout contributes its largest kitchen estimate because kitchens may prepare simultaneously. Cancelled/uncollected orders and older orders without a baseline contribute nothing.
+- Queue, walking and counter-payment time are excluded. This is an explained estimate, not measured campus time savings.
+- Bowl Lab and Noodle & Co. are retired. Existing accounts/orders and retry records remain usable for history and outstanding collection; new installs have nine kitchens and 45 sample items.
 
 ## Storage and security
 
@@ -103,7 +112,7 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. No runtime npm
 
 ## Verification and guides
 
-- `npm run check`: type checking, **160 automated tests**, production build.
+- `npm run check`: type checking, **172 automated tests**, production build.
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)

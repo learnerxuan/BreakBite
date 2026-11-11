@@ -17,7 +17,7 @@
 1. Run the application; browse the starter catalogue and register a student.
 2. Stop the server with Ctrl+C.
 3. Run `npm run operator`; enter a kitchen operator's name, email, kitchen ID and password.
-4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains the two original test kitchens and nine supplied-photo APU sample vendors. Do not publish passwords in the repository.
+4. Repeat for the required kitchen IDs shown by the operator command. The catalogue contains nine supplied-photo APU sample vendors. Bowl Lab and Noodle & Co. are retired; existing orders are preserved. Do not publish passwords in the repository.
 5. Start again. Use separate browser profiles for the student and operators.
 6. Operators replace the sample menu information, prices, preparation times and pickup location in their workspace.
 7. Operators confirm the menu has been reviewed in Kitchen settings; this removes that kitchen's sample label. This is operator acknowledgement, not independent verification.
@@ -30,7 +30,7 @@ The added project-purpose menus contain sample ingredients, spice levels, warnin
 - Choose a pickup window for each kitchen. The default suggestion staggers windows.
 - Set a realistic walking time between counters. One minute per handover is also reserved in the itinerary check.
 - Confirm once. All child reservations either succeed together or fail together.
-- View the checkout in My orders, with an individual status/code/amount for each kitchen.
+- View the checkout in My orders, with an individual status/code/amount for each kitchen. After collection, your estimated preparation wait avoided appears above the orders and on Explore; open its explanation for the assumptions.
 - Kitchens prepare independently. The student pays each counter separately; the operator scans the student's QR or enters the fallback code, then confirms payment received and handover.
 - Cancel each child independently before preparation and its agreed cancellation cutoff. Qualifying vendor delays allow an exception without a no-show penalty. No online charge/refund is performed.
 

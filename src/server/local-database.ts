@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import type { Actor, Slot, VendorState } from '../shared/model.js';
 import type { Store } from './store.js';
 import { requireThat } from './errors.js';
-import { seedVendor, VENDOR_IDS } from './seed.js';
+import { seedVendor, VENDOR_IDS, ALL_VENDOR_IDS, LEGACY_VENDOR_IDS } from './seed.js';
 
 export interface LocalAccount {
     id: string; email: string; name: string; role: 'student' | 'vendor'; vendorId?: string;
@@ -25,6 +25,19 @@ export interface LocalData {
     sessions: Record<string, LocalSession>; checkouts: Record<string, CheckoutRecord>;
 }
 export const accountActor = (a: LocalAccount): Actor => ({ id: a.id, name: a.name, role: a.role, ...(a.vendorId ? { vendorId: a.vendorId } : {}) });
+
+function retireLegacyKitchens(data: LocalData): boolean {
+    let changed = false;
+    for (const id of LEGACY_VENDOR_IDS) {
+        const vendor = data.vendors[id]?.vendor;
+        if (vendor && (!vendor.archived || vendor.open)) {
+            vendor.archived = true;
+            vendor.open = false;
+            changed = true;
+        }
+    }
+    return changed;
+}
 
 export function assertPickupItinerary(windows: Slot[], transferMinutes: number): void {
     const sorted = [...windows].sort((a, b) => a.startAt.localeCompare(b.startAt) || a.endAt.localeCompare(b.endAt));
@@ -74,7 +87,7 @@ export class LocalDatabase {
                 this.value = data;
                 // Add newly introduced sample kitchens without replacing existing operator data.
                 const migrated = structuredClone(this.value);
-                let changed = false;
+                let changed = retireLegacyKitchens(migrated);
                 for (const id of VENDOR_IDS) {
                     if (!migrated.vendors[id]) { migrated.vendors[id] = seedVendor(id); changed = true; }
                     else {
@@ -102,17 +115,18 @@ export class LocalDatabase {
             } catch (error) {
                 if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
                 const vendors: Record<string, VendorState> = {};
-                for (const id of VENDOR_IDS) {
+                for (const id of ALL_VENDOR_IDS) {
                     try {
                         const old = JSON.parse(await readFile(this.file(`${id}.json`), 'utf8')) as VendorState;
                         requireThat(old.schemaVersion === 1 && old.vendor.id === id, 'INVALID_STORE', 'Invalid legacy vendor file. Restore from backup; no data has been reset.', 500);
                         vendors[id] = old;
                     } catch (error) {
                         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-                        vendors[id] = seedVendor(id);
+                        if (!LEGACY_VENDOR_IDS.includes(id as typeof LEGACY_VENDOR_IDS[number])) vendors[id] = seedVendor(id);
                     }
                 }
                 this.value = { schemaVersion: 2, vendors, accounts: [], sessions: {}, checkouts: {} };
+                retireLegacyKitchens(this.value);
                 await this.persist(this.value, false);
             }
         } catch (error) { await this.close(); throw error; }

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { addLegacyTestKitchens } from './fixtures.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -22,7 +23,7 @@ const otherOp: Actor = { id:'operator-b', role:'vendor', vendorId:'noodle-co', n
 const code = (c:string) => (e:unknown) => e instanceof AppError && e.code===c;
 const food = (extra={}) => ({ingredients:'Rice, chicken, oil and soy sauce',allergensKnown:true,allergens:['soy'],mayContain:['sesame'],diets:[],spice:'mild',confirmed:true,...extra});
 async function setup(t:test.TestContext) {
-    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v3-'));const db=new LocalDatabase(dir);await db.open();
+    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v3-'));const db=new LocalDatabase(dir);await db.open();await addLegacyTestKitchens(db);
     let now=Date.now();const clock=()=>now; const store=new LocalStore(db);const service=new MealService(store,clock,'pay_at_pickup');const checkout=new CheckoutService(db,clock);const product=new ProductService(db,clock);
     t.after(async()=>{await db.close();await rm(dir,{recursive:true,force:true});});
     const groups=[{vendorId:'bowl-lab',items:[{itemId:'chicken-rice',quantity:1}],slotId:db.read().vendors['bowl-lab']!.slots[3]!.id}];

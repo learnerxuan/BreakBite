@@ -213,10 +213,10 @@ with sync_playwright() as p:
     errors=[]
     def page(width=1440,height=1000):
         ctx=b.new_context(viewport={'width':width,'height':height});pg=ctx.new_page();pg.set_default_timeout(12000);pg.on('pageerror',lambda e:errors.append(str(e)));pg.on('dialog',lambda d:d.accept());boot(pg);return pg
-    student=page();expect(student.locator('.bb-meal')).to_have_count(55)
+    student=page();expect(student.locator('.bb-meal')).to_have_count(45)
     assert 'Local Demo Only' not in student.locator('body').inner_text();assert student.locator('input[name=nextClassAt]').count()==0
     overflow(student);student.screenshot(path=str(OUT/'home-desktop.png'),full_page=True)
-    student.get_by_role('button',name='Add Golden chicken rice',exact=True).click();student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()
+    student.get_by_role('button',name='Add Nasi lemak ayam',exact=True).click();student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
     expect(student.locator('.bb-cart-group')).to_have_count(2)
     student_email = f'student-{uuid.uuid4().hex[:8]}@example.test'
     login(student,student_email,register=True)
@@ -228,17 +228,17 @@ with sync_playwright() as p:
     op=page();login(op,'operator.bowl@example.test');expect(op.locator('[data-vendor-tab]')).to_have_count(4)
     assert not any(c in op.locator('body').inner_text() for c in codes)
     expect(op.locator('.bb-order-grid').first.locator('.bb-order')).not_to_have_count(0)
-    op.get_by_role('button',name='Delays & recovery').click();op.locator('#incident-form select').select_option('chicken-rice');op.locator('#incident-form textarea').fill('Preparation unexpectedly delayed');op.locator('#incident-form input[type=number]').fill('20');op.get_by_role('button',name='Update affected orders').click()
+    op.get_by_role('button',name='Delays & recovery').click();op.locator('#incident-form select').select_option('nasi-lemak');op.locator('#incident-form textarea').fill('Preparation unexpectedly delayed');op.locator('#incident-form input[type=number]').fill('20');op.get_by_role('button',name='Update affected orders').click()
     op.get_by_role('button',name='Check alternatives').last.click();expect(op.get_by_role('button',name='Propose',exact=True).first).to_be_visible();op.get_by_role('button',name='Propose',exact=True).first.click();op.get_by_role('button',name='Approve for student').first.click()
     student.bring_to_front();expect(student.get_by_role('button',name='Accept alternative')).to_be_visible(timeout=15000);student.get_by_role('button',name='Accept alternative').click();expect(student.locator('#toast')).to_contain_text('Alternative accepted')
     new_codes=student.locator('.bb-pickup-code strong').all_inner_texts();assert set(codes)!=set(new_codes)
     student.set_viewport_size({'width':390,'height':844});student.screenshot(path=str(OUT/'orders-mobile.png'),full_page=True);overflow(student)
-    code=student.locator('.bb-order').filter(has=student.get_by_role('heading',name='Bowl Lab',exact=True)).locator('.bb-pickup-code strong').inner_text()
+    code=student.locator('.bb-order').filter(has=student.get_by_role('heading',name='Asian Cuisine',exact=True)).locator('.bb-pickup-code strong').inner_text()
     op.bring_to_front();op.get_by_role('button',name='Order queue',exact=True).click();op.get_by_role('button',name='Start preparing',exact=True).first.click();op.get_by_role('button',name='Mark ready',exact=True).first.click();form=op.locator('.bb-collect').first;form.locator('input[name=code]').fill(code);form.locator('input[type=checkbox]').check();form.get_by_role('button',name='Verify & complete pickup').click();expect(op.locator('#toast')).to_contain_text('Pickup completed')
     op.get_by_role('button',name='Menu & stock',exact=True).click();op.get_by_role('button',name='+ Add menu item',exact=True).click();expect(op.locator('#menu-dialog')).to_be_visible();op.get_by_label('Name',exact=True).fill('Kitchen special');op.get_by_label('Description',exact=True).fill('Operator-created menu item');op.get_by_label('Price (RM)',exact=True).fill('8.50');op.locator('input[name=foodConfirmed]').check();op.get_by_role('button',name='Save item',exact=True).click();expect(op.get_by_role('heading',name='Kitchen special',exact=True)).to_be_visible();op.set_viewport_size({'width':390,'height':844});overflow(op);op.screenshot(path=str(OUT/'vendor-mobile.png'),full_page=True)
     student.bring_to_front();student.get_by_role('button',name='Explore',exact=True).click();expect(student.locator('.bb-meal')).not_to_have_count(0);overflow(student);student.screenshot(path=str(OUT/'home-mobile.png'),full_page=True)
-    student.get_by_role('button',name='Add Sesame tofu bowl',exact=True).click()
-    student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()
+    student.get_by_role('button',name='Add Vegetable fried rice',exact=True).click()
+    student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
     fixture = test_timetable(student)
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(2)
@@ -286,7 +286,7 @@ with sync_playwright() as p:
     expect(student.locator('#fit-toggle')).not_to_be_checked()
     login(student, f'other-{uuid.uuid4().hex[:8]}@example.test', register=True)
     expect(student.locator('.bb-pending')).to_have_count(0)
-    student.get_by_role('button',name='Add Sparkling lemon',exact=True).click()
+    student.get_by_role('button',name='Add Brown sugar milk tea',exact=True).click()
     student.get_by_role('button',name='Choose pickup times').click()
     expect(student.locator('.bb-checkout-kitchen')).to_have_count(1)
     assert student.evaluate('window.quotePlans.at(-1).mode') == 'pickup'
@@ -304,7 +304,7 @@ with sync_playwright() as p:
     expect(student.locator('.bb-pending')).to_have_count(0)
     assert student.evaluate('sessionStorage.getItem("breakbite-checkout-v2")') is None
     assert student.evaluate('window.recovered.orders.map(o => o.id)') == student.evaluate('window.committed.orders.map(o => o.id)')
-    noodle_order = student.evaluate('window.recovered.orders.find(o => o.vendorId === "noodle-co")')
+    noodle_order = student.evaluate('window.recovered.orders.find(o => o.vendorId === "bobanika")')
     noodle_op = page()
     login(noodle_op, 'operator.noodle@example.test')
     noodle_id = noodle_order['id']
@@ -318,7 +318,7 @@ with sync_playwright() as p:
     student.bring_to_front()
     expect(student.locator('.bb-order').filter(has_text='Order ' + noodle_id[:8].upper())).to_contain_text('Collected')
     # Cancel only the fresh tofu order; the drink stays independently active.
-    tofu=student.locator('.bb-order').filter(has_text='Sesame tofu bowl').filter(has=student.get_by_role('button',name='Cancel this kitchen’s order'))
+    tofu=student.locator('.bb-order').filter(has_text='Vegetable fried rice').filter(has=student.get_by_role('button',name='Cancel this kitchen’s order'))
     tofu.get_by_role('button',name='Cancel this kitchen’s order').click()
     expect(student.locator('#toast')).to_contain_text('Kitchen order cancelled')
     student.get_by_role('button',name='Explore',exact=True).click()

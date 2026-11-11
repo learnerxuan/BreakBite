@@ -75,6 +75,13 @@
 - An unavailable source or unconfirmed change suppresses affected suggestions. A refresh preserves checkout retry records and accepted orders. The provider uses public timetable rows without requiring APSpace credentials.
 - Timetable gaps populate an optional break plan, not a capacity guarantee.
 
+## Estimated preparation wait avoided
+
+- New orders snapshot the longest menu preparation estimate, pickup start and effective ordering time. Accepted replacements refresh the baseline; earlier moves refresh the pickup start.
+- `shared/savings.ts` counts only collected, student-owned orders: max(0, min(order-ahead lead, prep estimate minus readiness lateness)), in whole minutes. Each checkout contributes its largest child value.
+- Totals are derived on the server from durable orders, so visits, retries and pickup replay cannot increment them. Old records without a baseline remain excluded. Queue/walking/payment savings are not measured.
+- Archived legacy kitchens are excluded from the catalogue, menu and availability. Their order records, credentials for outstanding collection and idempotency history remain intact.
+
 ## Browser and operational limits
 
 - Five-second polling; active editing and open scanner dialogs are not replaced by polling.

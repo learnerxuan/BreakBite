@@ -1,3 +1,13 @@
+# Estimated time saved and kitchen retirement — 11 November 2026
+
+- `npm run check` passed strict TypeScript checking, **172 automated tests (0 failures)** and the production build. Windows used `$env:npm_config_script_shell = (Get-Command pwsh).Source` for nested npm calls.
+- New tests cover preparation-baseline snapshots, late Ready, lead-time caps, replacement acceptance timing, collection-only credit, student ownership, retry/replay/restart stability and the largest saving per multi-kitchen checkout. The UI explains that queue/walking/payment time is excluded; this is an estimate, not measured campus impact.
+- Fresh installations expose nine kitchens and 45 sample items. Migration archives Bowl Lab/Noodle & Co. while preserving existing accounts, orders, reservations and idempotency records. Historical orders remain collectable; new orders are blocked. Stale cart lines are removed only when no checkout is pending.
+- All six Playwright suites passed over normal Chrome localhost HTTP with disposable data: `browser_product.py`, `browser_v3.py`, `browser_apspace.py`, `browser_campus.py`, `browser_notifications.py` and new `browser_savings.py`, using `--base-url <fixture URL> --chromium <Chrome executable>`. Layouts were checked at 360/390/768/1440px.
+- The savings journey verified a two-kitchen checkout earning 8 estimated minutes rather than 11 after both pickups, no credit before collection, private totals after reload and clearing on sign-out. Original checkout/recovery, QR decode/handover, timetable, sample-photo and allergy-filter journeys passed with the active campus kitchens.
+- A failing regression reproduced static asset requests consuming the API allowance. Static assets now bypass that allowance while the 300-request API/MCP limit and separate sign-in limit remain enforced; the regression checks both behaviors.
+- The existing local data was privately backed up with its server stopped before applying migration. The updated local server responds on localhost and the configured LAN address with nine kitchens/45 meals. Physical phone connectivity, phone camera and real push delivery were not verified in this run. Firestore/Vercel migration remains separate.
+
 # Combined branch verification — 11 November 2026
 
 - Integrated `codex/apspace-timetable` (`729a91c`) and `leeminhao-branch` (`f579d43`) from `982d766`. Resolved shared state, basket and CSS conflicts while preserving both workflows.

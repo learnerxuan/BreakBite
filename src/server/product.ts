@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Actor, ApspaceConnection, ApspaceSelection, ApspaceSource, MenuItem, Order, PublicOrder, Selection, Slot } from '../shared/model.js';
 import { emptyProfile, foodCheck, isClosed, type ApspacePreview, type ClassEvent, type Notice, type StudentProfile } from '../shared/features.js';
 import { malaysiaDate } from '../shared/timetable.js';
+import { preparationSavings, type SavingsSummary } from '../shared/savings.js';
 import type { ApspaceProvider, ApspaceSnapshot } from './apspace-timetable.js';
 import { LocalDatabase, DraftStore, assertPickupItinerary, type LocalData } from './local-database.js';
 import { MealService, safeOrder, parseSelections } from './domain.js';
@@ -76,7 +77,7 @@ function itinerary(d: LocalData, o: Order): void {
 export class ProductService {
     constructor(readonly db: LocalDatabase, private clock = Date.now, private apspaceProvider?: ApspaceProvider) {}
     get apspaceConfigured(): boolean { return Boolean(this.apspaceProvider); }
-    profile(a: Actor): { profile: StudentProfile; notices: Notice[] } {
+    profile(a: Actor): { profile: StudentProfile; notices: Notice[]; savings: SavingsSummary } {
         const d = this.db.read(); const p = profile(d, a);
         // Preview data is private to this account; never exposed to kitchens or other students.
         if (p.apspace && (!this.apspaceConfigured || this.clock() - Date.parse(p.apspace.lastSuccessfulAt) > apspaceFreshFor)) {
@@ -84,9 +85,10 @@ export class ProductService {
         }
         delete p.apspaceReviewed;
         delete p.apspaceGeneration;
-        return { profile: p, notices: (d.notices ?? []).filter(n => n.studentId === a.id).slice(-100).reverse() };
+        return { profile: p, notices: (d.notices ?? []).filter(n => n.studentId === a.id).slice(-100).reverse(),
+            savings: preparationSavings(Object.values(d.vendors).flatMap(state => state.orders), a.id) };
     }
-    loads() { return Object.values(this.db.read().vendors).map(s => bookingLoad(s, this.clock())); }
+    loads() { return Object.values(this.db.read().vendors).filter(s => !s.vendor.archived).map(s => bookingLoad(s, this.clock())); }
     async preferences(a: Actor, input: unknown): Promise<void> {
         const value = parsePreferences(input); await this.db.transaction(d => { profile(d, a).preferences = value; });
     }
@@ -442,6 +444,7 @@ export class ProductService {
             for (const l of o.lines) s.items.find(i => i.id === l.itemId)!.stock -= l.quantity;
             const slot = s.slots.find(w => w.id === next.id)!; slot.reservedUnits += o.lines.reduce((n, l) => n + l.prepUnits * l.quantity, 0); slot.reservedHandovers++;
             o.slotId = slot.id; o.estimatedReadyAt = slot.endAt; o.promisedPickupEndAt = slot.endAt; if (!('nextClassAt' in o.plan)) o.latestPickupAt = slot.endAt;
+            if (o.preparationBaseline) o.preparationBaseline.pickupStartAt = slot.startAt;
             o.cancelBeforeAt = stamp(Date.parse(slot.startAt) - (o.policy?.cancellationMinutes ?? 0) * minute);
             o.qrToken = ''; o.pickupCode = randomBytes(5).toString('hex').toUpperCase(); o.version++; o.updatedAt = stamp(this.clock());
             itinerary(d, o); for (const p of s.proposals) if (p.orderId === o.id && ['approved', 'pending_vendor'].includes(p.status)) p.status = 'stale';

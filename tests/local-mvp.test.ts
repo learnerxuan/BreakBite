@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { addLegacyTestKitchens } from './fixtures.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -20,7 +21,7 @@ const bowl: Actor = { id: 'op-bowl', name: 'Bowl operator', role: 'vendor', vend
 const noodle: Actor = { id: 'op-noodle', name: 'Noodle operator', role: 'vendor', vendorId: 'noodle-co' };
 const isCode = (code: string) => (e: unknown) => e instanceof AppError && e.code === code;
 async function fixture(t: test.TestContext) {
-    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v2-')); const db=new LocalDatabase(dir);await db.open();
+    const dir=await mkdtemp(path.join(os.tmpdir(),'breakbite-v2-')); const db=new LocalDatabase(dir);await db.open();await addLegacyTestKitchens(db);
     t.after(async()=>{await db.close();await rm(dir,{recursive:true,force:true});});
     const store=new LocalStore(db); const service=new MealService(store,Date.now,'pay_at_pickup');const checkout=new CheckoutService(db);
     const groups: BasketGroup[]=[{vendorId:'bowl-lab',items:[{itemId:'chicken-rice',quantity:1}],slotId:db.read().vendors['bowl-lab']!.slots[0]!.id},{vendorId:'noodle-co',items:[{itemId:'lemon-water',quantity:1}],slotId:db.read().vendors['noodle-co']!.slots[1]!.id}];

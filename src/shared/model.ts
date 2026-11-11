@@ -7,6 +7,7 @@ export interface Actor {
     vendorId?: string;
 }
 export interface Vendor {
+    archived?: boolean;
     id: string;
     name: string;
     description: string;
@@ -66,6 +67,7 @@ export interface OrderLine extends Selection {
 }
 export type OrderStatus = 'confirmed' | 'preparing' | 'ready' | 'collected' | 'cancelled' | 'uncollected';
 export interface Order {
+    preparationBaseline?: { minutes: number; pickupStartAt: string; orderedAt?: string };
     id: string;
     studentId: string;
     vendorId: string;

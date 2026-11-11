@@ -1,5 +1,6 @@
 import type { Allergen, StudentProfile, Notice, BookingLoad } from '../shared/features.js';
 import { emptyProfile } from '../shared/features.js';
+import type { SavingsSummary } from '../shared/savings.js';
 import type { Actor, AppConfig, BasketQuote, BreakPlan, MenuItem, RecoveryOption, Snapshot, TimetableBreak, TimetableImport, Vendor } from '../shared/model.js';
 export interface CartLine { vendorId: string; itemId: string; quantity: number; }
 interface AcceptedTimetable {
@@ -28,6 +29,7 @@ export function defaultBreakPlan(now = Date.now()): BreakPlan {
 }
 
 export interface ViewState {
+    savings: SavingsSummary;
     profile: StudentProfile; notices: Notice[]; loads: BookingLoad[];
     apspaceSetup?: { options: { intake: string; groups: string[] }[]; intake: string; group: string; invalid?: boolean };
     apspaceFeedback?: { text: string; error?: boolean };
@@ -51,7 +53,7 @@ export function initialState(): ViewState {
     let cart: CartLine[] = [];
     try { const c: unknown = JSON.parse(sessionStorage.getItem('breakbite-cart-v2') ?? '[]'); if (Array.isArray(c) && c.length <= 25) cart = c.filter(x => x && typeof x.itemId === 'string' && typeof x.vendorId === 'string' && Number.isInteger(x.quantity) && x.quantity > 0 && x.quantity <= 5); } catch { /* Ignore an invalid client cache; the server validates everything. */ }
     return { profile: emptyProfile(), notices: [], loads: [], detailItem: null, qr: null, scanner: false, scanResult: null, scanPayload: "", basketMessages: [], earlier: {}, config: null, actor: null, snapshot: null, vendors: [], items: [], cart, view: 'explore', vendorTab: 'queue', search: '', category: 'All', vendorFilter: 'all', allergenFilters: [], fitBreak: false,
-        plan: defaultBreakPlan(), planDraft: {}, manualPlan: false, timetable: emptyTimetable(), serverClock: null,
+        savings: { minutes: 0, checkouts: 0 }, plan: defaultBreakPlan(), planDraft: {}, manualPlan: false, timetable: emptyTimetable(), serverClock: null,
         quote: null, chosen: {}, transferMinutes: 2, busy: false, offline: false, auth: null, authError: '', editing: null, recovery: {}, checkoutError: '', success: '', uncertain: false };
 }
 export const planningNow = (s: ViewState): number => s.serverClock

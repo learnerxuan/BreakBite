@@ -62,8 +62,8 @@ with sync_playwright() as playwright:
     page.get_by_role('button', name='My planner', exact=True).click()
     page.get_by_role('button', name='Fit a meal').click()
     expect(page.locator('#plan-form')).to_contain_text('Times from your saved timetable')
-    page.get_by_role('button', name='Add Golden chicken rice', exact=True).click()
-    page.get_by_role('button', name='Add Sparkling lemon', exact=True).click()
+    page.get_by_role('button', name='Add Nasi lemak ayam', exact=True).click()
+    page.get_by_role('button', name='Add Brown sugar milk tea', exact=True).click()
     page.get_by_label('Food budget (RM)').fill('5')
     with page.expect_request(lambda request: request.url.endswith('/api/checkout/quote')) as quoted:
         page.get_by_role('button', name='Choose pickup times', exact=True).click()

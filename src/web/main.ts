@@ -1,5 +1,6 @@
 import { pushAction, refreshPush, pushFingerprint, detachPush } from './push-client.js';
 import { foodCheck, emptyProfile, type StudentProfile, type Notice, type BookingLoad } from '../shared/features.js';
+import type { SavingsSummary } from '../shared/savings.js';
 import { productActions, stopCamera } from './product-actions.js';
 import { personalView, productDialogs, availabilityView } from './views/personal.js';
 import type { Actor, AppConfig, BasketGroup, BasketQuote, CheckoutResult, MenuItem, RecoveryOption, Snapshot, Vendor } from '../shared/model.js';
@@ -64,6 +65,7 @@ function setActor(actor: Actor | null): void {
         s.fitBreak = false; s.plan = defaultBreakPlan(); s.planDraft = {}; s.manualPlan = false;
         s.quote = null; s.chosen = {}; s.checkoutError = ''; s.snapshot = null; s.serverClock = null;
         s.profile = emptyProfile(); s.notices = []; noticeIds.clear(); noticesInitialised = false;
+        s.savings = { minutes: 0, checkouts: 0 };
     }
     s.actor = actor;
 }
@@ -80,12 +82,13 @@ async function refresh(): Promise<void> {
             const loads = await api<BookingLoad[]>('/api/product/loads');
             if (generation !== actorGeneration) return;
             if (snapshot.actor.role === 'student') {
-                const p = await api<{profile:StudentProfile;notices:Notice[]}>('/api/product/profile');
+                const p = await api<{profile:StudentProfile;notices:Notice[];savings:SavingsSummary}>('/api/product/profile');
                 if (generation !== actorGeneration) return;
                 const fresh = p.notices.filter(n => !n.readAt && !noticeIds.has(n.id));
                 if (noticesInitialised && fresh.length) notify(fresh[0]!.message);
                 noticesInitialised = true;
                 noticeIds = new Set(p.notices.map(n => n.id)); s.profile = p.profile; s.notices = p.notices;
+                s.savings = p.savings ?? { minutes: 0, checkouts: 0 };
                 timetable.clearStaleSavedBreak();
             }
             s.snapshot = snapshot; s.vendors = snapshot.vendors; s.items = snapshot.items; s.loads = loads;
@@ -99,6 +102,15 @@ async function refresh(): Promise<void> {
         }
     }
     else {const c=await api<{vendors:Vendor[];items:MenuItem[];loads:BookingLoad[]}>('/api/catalog');if(generation!==actorGeneration)return;s.vendors=c.vendors;s.items=c.items;s.loads=c.loads;}
+    if (!attempt && !s.uncertain) {
+        const availableKitchenIds = new Set(s.vendors.filter(vendor => !vendor.archived).map(vendor => vendor.id));
+        const current = s.cart.filter(line => availableKitchenIds.has(line.vendorId));
+        if (current.length !== s.cart.length) {
+            s.cart = current;
+            s.basketMessages = [...s.basketMessages, 'Items from retired kitchens were removed from your basket. Existing orders are unchanged.'];
+            invalidate();
+        }
+    }
     if(s.view==='inbox') await refreshPush(s.actor);
     s.offline=false;
 }
@@ -342,10 +354,10 @@ async function boot(): Promise<void> {
         render();
         setInterval(()=>{if(refreshing||s.busy||s.scanner)return;refreshing=true;
             const generation=actorGeneration;
-            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
+            const before=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,savings:s.savings,checkoutError:s.checkoutError});
             void refresh().then(()=>{
                 if(generation!==actorGeneration){if(!s.busy)render();return;}
-                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,checkoutError:s.checkoutError});
+                const after=JSON.stringify({orders:s.snapshot?.orders,items:s.items,vendors:s.vendors,proposals:s.snapshot?.proposals,incidents:s.snapshot?.incidents,offline:s.offline,notices:s.notices,loads:s.loads,push:pushFingerprint(),profile:s.profile,savings:s.savings,checkoutError:s.checkoutError});
                 const active=document.activeElement;
                 const editing=['INPUT','TEXTAREA','SELECT'].includes(active?.tagName??'')||Boolean(active?.closest('.bb-timetable, #plan-form'));
                 if(before!==after&&!editing&&!s.busy&&!s.quote&&!s.auth&&!s.editing&&!s.qr&&!s.detailItem&&!document.hidden)render();

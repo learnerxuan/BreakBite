@@ -81,17 +81,19 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 json(res, 200, { ok: true, version: '0.3.1', mode: config.mode, storage: config.cloud ? 'firestore' : 'local-file' });
                 return;
             }
-            const key = req.socket.remoteAddress ?? 'unknown';
-            if (limits.size > 5000)
-                for (const [id, limit] of limits)
-                    if (limit.until < Date.now())
-                        limits.delete(id);
-            let limit = limits.get(key);
-            if (!limit || limit.until < Date.now()) {
-                limit = { count: 0, until: Date.now() + 60000 };
-                limits.set(key, limit);
+            // Catalogue images/modules must not spend the allowance reserved for API work.
+            if (pathname.startsWith('/api/') || pathname === '/mcp') {
+                const key = req.socket.remoteAddress ?? 'unknown';
+                if (limits.size > 5000)
+                    for (const [id, limit] of limits)
+                        if (limit.until < Date.now()) limits.delete(id);
+                let limit = limits.get(key);
+                if (!limit || limit.until < Date.now()) {
+                    limit = { count: 0, until: Date.now() + 60000 };
+                    limits.set(key, limit);
+                }
+                requireThat(++limit.count <= 300, 'RATE_LIMIT', 'Too many requests. Retry shortly.', 429);
             }
-            requireThat(++limit.count <= 300, 'RATE_LIMIT', 'Too many requests. Retry shortly.', 429);
             if (pathname === '/mcp') {
                 requireThat(req.method === 'POST', 'METHOD_NOT_ALLOWED', 'This stateless MCP endpoint accepts POST only.', 405);
                 const actor = await auth.agent(req);
@@ -114,7 +116,7 @@ export function createApp(config: Settings, service: MealService, db?: LocalData
                 return;
             }
             if (config.mode === 'local' && pathname === '/api/catalog' && req.method === 'GET') {
-                const states = await Promise.all((await service.store.ids()).map(id => service.store.read(id)));
+                const states = (await Promise.all((await service.store.ids()).map(id => service.store.read(id)))).filter(s => !s.vendor.archived);
                 json(res, 200, { vendors: states.map(s => s.vendor), items: states.flatMap(s => s.items), loads: product?.loads() ?? [], serverTime: new Date().toISOString() });
                 return;
             }
