@@ -7,6 +7,7 @@ from browser_support import ROOT, login, open_basket, overflow
 parser=argparse.ArgumentParser()
 parser.add_argument('--base-url',default='http://127.0.0.1:8110')
 parser.add_argument('--chromium')
+parser.add_argument('--ignore-https-errors',action='store_true',help='Disposable self-signed localhost TLS fixture only')
 args=parser.parse_args()
 out=ROOT/'test-results'/'kitchen'
 out.mkdir(parents=True,exist_ok=True)
@@ -14,7 +15,7 @@ with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,executable_path=args.chromium)
     errors=[]
     def page():
-        pg=browser.new_page(viewport={'width':390,'height':844})
+        pg=browser.new_page(viewport={'width':390,'height':844},ignore_https_errors=args.ignore_https_errors)
         pg.on('pageerror',lambda error:errors.append(str(error)))
         pg.on('dialog',lambda dialog:dialog.accept())
         pg.goto(args.base_url)

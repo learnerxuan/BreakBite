@@ -7,6 +7,12 @@ import { AppError } from '../src/server/errors.js';
 import { VENDOR_IDS } from '../src/server/seed.js';
 
 const root = 'envs/orphan-review';
+test('failed startup releases its SDK resources before a serverless retry', async () => {
+    const docs = new MemoryFirestore(); let closed = 0;
+    const db = new FirestoreDatabase({ ...docs, get: async () => { throw new Error('unavailable'); }, list: docs.list.bind(docs), listDocumentIds: docs.listDocumentIds.bind(docs), commit: docs.commit.bind(docs), close: async () => { closed++; } }, { root, directory: os.tmpdir() });
+    await assert.rejects(db.open(), /unavailable/); assert.equal(closed, 1);
+    await db.close(); assert.equal(closed, 1);
+});
 const record = { data: { key: 'orphan', seq: 1, payload: '{}' }, version: 'v1' };
 
 test('document reference listing includes deleted parents with surviving descendants', async () => {

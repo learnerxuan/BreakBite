@@ -120,10 +120,12 @@ COOKIE_SECURE=false
 
 ## Deployment and license boundaries
 
+- Current cloud option: Firestore storage and Vercel configuration are implemented. Follow [Vercel setup](VERCEL.md); actual account credentials and hosted acceptance remain separate. Vercel maintenance runs during requests unless an external scheduler is connected; the local server retains its timers.
+
 - Google Cloud/Firebase and Gemini Enterprise are not prerequisites for the JSON product.
 - The old Firebase and MCP code is retained for migration, but the current UI rejects non-local mode rather than pretending multi-kitchen cloud checkout is ready.
-- Cloud migration must implement one atomic cross-kitchen transaction, adapt authentication, and rerun the complete acceptance tests.
-- The published hackathon requirement to use Gemini Enterprise is still a separate deliverable; a JSON-only product does not by itself satisfy it.
+- Firestore preserves atomic cross-kitchen checkout and local-account authentication; the emulator acceptance suite has passed. A new root does not migrate laptop accounts automatically.
+- Gemini integration and the organiser's current requirements must be checked separately; hosting alone does not establish hackathon eligibility.
 - Online payments, refunds, production hardening, campus agreements and measured impact are not claimed.
 
 ## Optional container packaging

@@ -1,0 +1,13 @@
+.git
+.data
+.data-*
+.arc
+.env*
+!.env.example
+dist-tests
+tests
+docs
+infra
+*.log
+*service-account*.json
+*-credentials.json

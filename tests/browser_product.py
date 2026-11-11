@@ -10,7 +10,7 @@ from pathlib import Path
 from time import monotonic, sleep
 from playwright.sync_api import sync_playwright, expect
 ROOT=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--base-url',default='http://127.0.0.1:8080');p.add_argument('--bridge',action='store_true');p.add_argument('--chromium');p.add_argument('--apspace-export',type=Path,action='append',default=[]);args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--base-url',default='http://127.0.0.1:8080');p.add_argument('--bridge',action='store_true');p.add_argument('--chromium');p.add_argument('--apspace-export',type=Path,action='append',default=[]);p.add_argument('--ignore-https-errors',action='store_true',help='Disposable self-signed localhost TLS fixture only');args=p.parse_args()
 OUT=ROOT/'test-results'/'product';OUT.mkdir(parents=True,exist_ok=True)
 PASSWORD=os.environ.get('TEST_OPERATOR_PASSWORD','Fixture-only-password-2026')
 
@@ -212,7 +212,7 @@ with sync_playwright() as p:
     b=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}))
     errors=[]
     def page(width=1440,height=1000):
-        ctx=b.new_context(viewport={'width':width,'height':height});pg=ctx.new_page();pg.set_default_timeout(12000);pg.on('pageerror',lambda e:errors.append(str(e)));pg.on('dialog',lambda d:d.accept());boot(pg);return pg
+        ctx=b.new_context(viewport={'width':width,'height':height},ignore_https_errors=args.ignore_https_errors);pg=ctx.new_page();pg.set_default_timeout(12000);pg.on('pageerror',lambda e:errors.append(str(e)));pg.on('dialog',lambda d:d.accept());boot(pg);return pg
     student=page();expect(student.locator('.bb-meal')).to_have_count(45)
     assert 'Local Demo Only' not in student.locator('body').inner_text();assert student.locator('input[name=nextClassAt]').count()==0
     overflow(student);student.screenshot(path=str(OUT/'home-desktop.png'),full_page=True)

@@ -5,6 +5,8 @@
 
 ## Runtime
 
+- Vercel deployment uses `api/index.mjs` → `server/serverless.ts`, with an awaited request handler and no server interval timers. HTTPS cookies, shared Firestore, separate preview roots and Vercel client-address limits are enforced. Menu uploads use private Vercel Blob, while static assets remain bundled. See [Vercel setup and maintenance limits](VERCEL.md). A live deployment is not yet verified.
+
 - Native TypeScript/CSS browser modules and Node HTTP backend.
 - `AUTH_MODE=local`, `STORE=file`; cookie-authenticated accounts and persistent JSON.
 - Optional `STORE=firestore`: the same `LocalData` in Cloud Firestore through `firebase-admin`, one document per record, one atomic commit per change and a ROOT updateTime precondition for cross-process safety. See [FIRESTORE.md](FIRESTORE.md).

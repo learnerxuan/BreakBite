@@ -30,7 +30,7 @@ async function refreshWindows(): Promise<void> {
         for (const id of await store.ids()) {
             const s = await store.read(id);
             if (s.vendor.open && !s.slots.some(w => Date.parse(w.startAt) > Date.now() + 165 * 60000))
-                await service.openPickupWindows({ id: 'scheduler', name: 'Pickup scheduler', role: 'vendor', vendorId: id }, id, { kitchenCapacity: s.vendor.onlineKitchenCapacity ?? 8, pickupCapacity: s.vendor.onlinePickupCapacity ?? 4 });
+                await service.openPickupWindows({ id: 'scheduler', name: 'Pickup scheduler', role: 'vendor', vendorId: id }, id, { kitchenCapacity: s.vendor.onlineKitchenCapacity ?? 8, pickupCapacity: s.vendor.onlinePickupCapacity ?? 4 }, true);
         }
     } finally { refreshing = false; }
 }

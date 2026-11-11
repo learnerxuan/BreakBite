@@ -1,6 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { fileMedia, type MediaStore } from './media-store.js';
 import type { Actor, ApspaceConnection, ApspaceSelection, ApspaceSource, MenuItem, Order, PublicOrder, Selection, Slot } from '../shared/model.js';
 import { emptyProfile, foodCheck, isClosed, type ApspacePreview, type ClassEvent, type Notice, type StudentProfile } from '../shared/features.js';
 import { malaysiaDate } from '../shared/timetable.js';
@@ -75,7 +74,7 @@ function itinerary(d: LocalData, o: Order): void {
     assertPickupItinerary(windows, checkout.transferMinutes ?? 2);
 }
 export class ProductService {
-    constructor(readonly db: Database, private clock = Date.now, private apspaceProvider?: ApspaceProvider) {}
+    constructor(readonly db: Database, private clock = Date.now, private apspaceProvider?: ApspaceProvider, private media: MediaStore = fileMedia(db.directory)) {}
     get apspaceConfigured(): boolean { return Boolean(this.apspaceProvider); }
     profile(a: Actor): { profile: StudentProfile; notices: Notice[]; savings: SavingsSummary } {
         const d = this.db.read(); const p = profile(d, a);
@@ -465,7 +464,7 @@ export class ProductService {
         else if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') ext = 'webp';
         requireThat(ext, 'INVALID_PHOTO', 'Only raster JPEG, PNG and WebP photos are accepted. SVG and HTML are not allowed.');
         const filename = `${createHash('sha256').update(bytes).digest('hex')}.${ext}`;
-        await mkdir(path.join(this.db.directory, 'media'), { recursive: true }); await writeFile(path.join(this.db.directory, 'media', filename), bytes, { mode: 0o600 });
+        await this.media.put(filename, bytes);
         await this.db.transaction(d => { const i: MenuItem = d.vendors[a.vendorId!]!.items.find(i => i.id === itemId)!; i.photoPath = `/media/${filename}`; i.photoCredit = credit; });
     }
 }

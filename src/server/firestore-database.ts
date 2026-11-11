@@ -160,10 +160,18 @@ export class FirestoreDatabase implements Database {
         this.log = options.log ?? (() => undefined);
     }
     async open(): Promise<void> {
-        await this.load(true);
-        this.opened = true;
-        this.checkedAt = Date.now();
-        if (upgradeSeedKitchens(structuredClone(this.value))) await this.transaction(d => { upgradeSeedKitchens(d); });
+        try {
+            await this.load(true);
+            this.opened = true;
+            this.checkedAt = Date.now();
+            if (upgradeSeedKitchens(structuredClone(this.value))) await this.transaction(d => { upgradeSeedKitchens(d); });
+        } catch (error) {
+            this.opened = false;
+            // A serverless startup retry creates a new SDK app. Release this failed
+            // instance too, including failures before opened was set.
+            try { await this.docs.close?.(); } catch { /* Preserve the original startup failure. */ }
+            throw error;
+        }
     }
     read(): LocalData { return structuredClone(this.value); }
     async transaction<T>(work: (draft: LocalData) => T | Promise<T>): Promise<T> {
