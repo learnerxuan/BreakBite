@@ -16,7 +16,7 @@ with sync_playwright() as p:
     page.on('pageerror',lambda error:errors.append(str(error)))
     page.goto(args.base_url)
     expect(page.locator('.bb-meal')).to_have_count(45)
-    expect(page.locator('.bb-meal-register')).to_be_visible()
+    expect(page.locator('.bb-food-cards')).to_be_visible()
     expect(page.get_by_text('Sample menu',exact=False)).to_have_count(0)
     rail=page.locator('#prep-rail')
     assert rail.get_attribute('open') is None, 'Phone comparison must start collapsed'

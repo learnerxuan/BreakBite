@@ -220,7 +220,7 @@ html{scrollbar-color:#a7b4aa var(--bb-paper)}body{font-size:16px;line-height:1.5
 
 .bb-history-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:20px 0}.bb-history-filters label{flex:1;min-width:160px}.bb-history-table-wrap{max-width:100%;overflow-x:auto;background:#fff;border:1px solid var(--bb-line);border-radius:14px}.bb-history-table{border-collapse:collapse;width:100%;min-width:760px;text-align:left;font-size:13px}.bb-history-table th,.bb-history-table td{padding:16px;vertical-align:top;border-bottom:1px solid var(--bb-line)}.bb-history-table thead{background:#edf1e6}.bb-history-table tbody tr:last-child>*{border-bottom:0}.bb-history-table small{display:block;color:var(--bb-muted);font-size:11px;font-weight:400;margin-top:5px}.bb-history-table td:nth-child(4){white-space:nowrap;font-weight:700}.bb-kitchen-state{display:inline-block;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;white-space:nowrap}.bb-kitchen-state.open{background:#e5efe1;color:#245539}.bb-kitchen-state.closed,.bb-kitchen-state.stale{background:#efeee7;color:#5c6256}.bb-kitchen-state.delayed{background:#fff0d7;color:#805012}.bb-meal-pickup{font-size:10px;margin:4px 0 14px;padding-top:10px;border-top:1px solid var(--bb-line);color:var(--bb-muted)}.bb-meal-pickup strong{display:block;font-size:12px;margin:7px 0 4px;color:var(--bb-ink)}.bb-meal-pickup small{font-size:10px;display:block}.bb-kitchen-activity{font-weight:650;font-size:13px}@media(max-width:600px){.bb-history-filters label{flex-basis:100%}.bb-history-filters input,.bb-history-filters select{font-size:16px}.bb-load-card>.bb-section-head{flex-wrap:wrap}}
 
-/* Ivan's compact register with the current product's readable operational details. */
+/* Current campus browsing and menu controls. */
 .bb-campus-search{grid-template-columns:minmax(0,1fr) 210px auto!important;gap:12px;margin:22px 0 16px}
 .bb-campus-search .bb-kitchen-filter{grid-column:auto!important;width:100%;max-width:none}
 .bb-campus-search input,.bb-campus-search select,.bb-campus-search>.bb-button{min-height:52px}
@@ -290,3 +290,23 @@ html{scrollbar-color:#a7b4aa var(--bb-paper)}body{font-size:16px;line-height:1.5
 }
 
 @media(max-width:600px){.bb-area-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;gap:2px;background:var(--bb-ink);border-radius:12px}.bb-area-intro{grid-column:1/-1;min-height:50px;padding:10px 12px;display:grid;grid-template-columns:20px 1fr;gap:0 8px;align-items:center}.bb-area-intro .icon{grid-row:1/3}.bb-area-intro strong{font-size:12px}.bb-area-intro small{font-size:10px}.bb-area-card{min-width:0;min-height:112px;padding:8px}.bb-area-card>span:first-of-type{min-height:96px}.bb-area-card strong{font-size:12px;line-height:1.2}.bb-area-card small{font-size:9px;line-height:1.4}.bb-area-selected{top:5px;right:5px;padding:2px}.bb-area-selected .icon{width:15px;height:15px}.bb-browse-filters .bb-allergy-filters>summary{padding:12px;gap:8px}.bb-allergy-title{flex-shrink:0}.bb-allergy-cta{gap:7px;line-height:1.4}}
+
+/* Photo-led student food cards; operational data and controls stay inside each card. */
+.bb-menu-workspace>.bb-menu-heading{display:flex;align-items:end;justify-content:space-between}
+.bb-food-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
+.bb-food-cards .bb-meal{display:flex;flex-direction:column;background:#fff;border:1px solid var(--bb-line);border-radius:20px;overflow:hidden}
+.bb-food-cards .bb-meal-art{height:200px;min-height:200px;position:relative}
+.bb-food-cards .bb-meal-body{display:flex;flex-direction:column;flex:1;min-width:0;padding:20px}
+.bb-food-cards .bb-kitchen-name{font-size:12px;line-height:1.5}
+.bb-food-cards .bb-meal h3{font-size:18px;line-height:1.3;margin:10px 0 12px}
+.bb-food-cards .bb-meal-body>p{font-size:13px;line-height:1.6;margin:0 0 14px}
+.bb-food-cards .bb-food-tags{margin:4px 0 12px}.bb-food-cards .bb-food-tags span{font-size:12px}
+.bb-food-cards .bb-allergen-note{font-size:13px!important;line-height:1.6!important;display:block;overflow:visible}
+.bb-food-cards .bb-text-button{align-self:flex-start;min-height:44px;padding:10px 0;font-size:13px;text-align:left}
+.bb-food-cards .bb-availability{font-size:12px;margin:8px 0 16px}
+.bb-food-cards .bb-meal-pickup{margin:0 0 18px;padding-top:14px;font-size:11px}.bb-food-cards .bb-meal-pickup strong{font-size:13px}.bb-food-cards .bb-meal-pickup small{font-size:11px}
+.bb-food-cards .bb-card-bottom{margin-top:auto;padding-top:4px;display:flex;align-items:center;justify-content:space-between;gap:12px}.bb-food-cards .bb-card-bottom>strong{font-size:20px}
+.bb-food-cards .bb-add{min-height:44px;padding:10px 16px;border-radius:12px;font-size:13px}
+.bb-food-cards .bb-heart{width:44px;height:44px}.bb-food-cards .bb-prep{font-size:11px;padding:5px 10px;z-index:1}
+@media(max-width:1200px){.bb-food-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.bb-food-cards{grid-template-columns:minmax(0,1fr);gap:18px}.bb-food-cards .bb-meal-art{height:210px;min-height:210px}.bb-food-cards .bb-meal-body{padding:18px}.bb-food-cards .bb-meal h3{font-size:20px}}
