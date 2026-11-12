@@ -14,7 +14,7 @@ export function kitchenStatus(s: ViewState, vendorId: string): string {
     return `<span class="bb-kitchen-state ${!load!.open?'closed':load!.delayed?'delayed':'open'}">${label}</span>`;
 }
 export function kitchenActivity(load: BookingLoad): string {
-    return load.activity?`${load.activity.preparing} preparing · ${load.activity.scheduled} scheduled · ${load.activity.ready} ready`:'Order counts updating';
+    return load.activity ? `<dl class="bb-kitchen-counts" aria-label="BreakBite order counts"><div class="preparing"><dt>Preparing</dt><dd>${load.activity.preparing}</dd></div><div class="scheduled"><dt>Scheduled</dt><dd>${load.activity.scheduled}</dd></div><div class="ready"><dt>Ready</dt><dd>${load.activity.ready}</dd></div></dl>` : '<p class="bb-small">Order counts updating</p>';
 }
 export function mealPickup(s: ViewState, item: MenuItem): string {
     const load=s.loads.find(l=>l.vendorId===item.vendorId);

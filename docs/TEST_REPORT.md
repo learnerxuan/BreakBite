@@ -1,3 +1,10 @@
+# Submission documentation, kitchen status and hosted push — 12 November 2026
+
+- `npm run check`: **220 passed, 1 opt-in live-project skip**, strict TypeScript and production build passed. Added regressions for failed settings refresh, successful recovery, HTTP phone guidance and an awaited push-test delivery attempt on serverless hosting. Existing privacy, opt-in, ownership, retries and logout tests remain passing.
+- Chrome checks at 360/390/768/1440px passed the labelled Preparing/Scheduled/Ready tiles, single shared explanation, no horizontal overflow and hiding stale counts after connection loss. Desktop/phone screenshots were visually inspected.
+- Created nine explicitly public judge demo operator accounts in the shared Firestore dataset, without resetting existing accounts/orders. All nine logins, kitchen scope and CSRF-protected logouts passed against the public HTTPS deployment. Their demo credentials are intentionally published in README at the project owner's request; service-account/VAPID/scheduler keys remain private.
+- Stable push keys, `PUSH_ENABLED=true`, Vercel `CRON_SECRET`, Actions `BREAKBITE_CRON_SECRET` and the scheduler enable variable were configured. The five-minute Actions workflow must reach main and its first authorized run must pass before claiming scheduled operation. Public configuration and real-device delivery require checks after redeployment. No physical-phone notification receipt is claimed here.
+
 # Refreshed time-saved panel and local port — 12 November 2026
 
 - Reworked the personal impact panel with a cream statistic tile, collected-checkout badge, clearer text hierarchy and a decorative order-ahead/preparation/collection illustration. Retained the exact server total, student-only visibility, zero state and calculation explanation. Large totals use smaller type; the illustration is hidden on narrow screens. No savings formula or backend behaviour changed.

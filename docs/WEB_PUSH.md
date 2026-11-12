@@ -1,5 +1,11 @@
 # Background web push — v0.3.1
 
+## Hosted MVP
+
+The HTTPS demo has stable private VAPID keys and `PUSH_ENABLED=true`. Inbox explains browser permission, HTTPS and iOS Home Screen requirements without exposing operator environment settings. A failed refresh no longer reports success. HTTP phone testing shows the HTTPS instruction rather than attempting a forbidden authenticated push request. Test notifications attempt delivery within the awaited request.
+
+The protected maintenance endpoint is called by `.github/workflows/maintenance.yml` about every five minutes when `BREAKBITE_MAINTENANCE_ENABLED=true`; its bearer credential is stored only in GitHub Actions/Vercel secrets. Scheduled runs can be delayed, and expired/read notices remain suppressed. Physical-device subscription and closed-tab display still require the acceptance steps below.
+
 ## What changed
 
 - **Availability** is a separate student/guest navigation tab. Explore no longer embeds the kitchen timeline. Kitchen operators retain their own capacity view.
@@ -72,7 +78,7 @@ On iPhone/iPad, add the site to the Home Screen and open it from that icon befor
 
 - Tested: existing regression suite; RFC encryption vector; VAPID signature/audience/expiry; receiver-side decryption; ownership/CSRF; durable retries; cleanup; logout/reset revocation; service-worker event handling; opt-in/rollback UI logic.
 - Browser interaction/layout checks use the documented isolated renderer + real local API bridge.
-- Not tested here: an actual external browser push subscription, real remote push-service acceptance, a closed-tab physical phone, HTTPS browser-cookie enforcement or public hosting. The environment cannot navigate to localhost in Chromium or resolve external push hosts.
+- Public HTTPS/Firestore, registration/login/session cookies, CSRF rejection and phone-sized layouts have since been verified on Vercel. An actual external browser subscription, remote push-service acceptance and closed-tab physical-phone display remain separate acceptance checks; source tests do not establish device delivery.
 - Complete the five-step phone acceptance above before calling the deployment verified. SMS, email, Google migration and Gemini integration remain separate.
 
 ## Primary references

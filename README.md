@@ -2,11 +2,50 @@
 ## Order ahead. Enjoy your break.
 
 - **Track:** Smart Campus & Student Experience.
-- **Current version:** v0.3.1 — a working website with local accounts and persistent JSON or optional Firestore storage.
+- **Current version:** v0.3.1 — deployed on Vercel with Cloud Firestore, cookie accounts and a responsive campus menu. JSON storage remains available for local development.
 - **For APU students:** an independent student project, not an official campus service.
 - Browse before arriving, order from multiple kitchens, choose realistic pickup windows and collect separately.
 - Ordinary ordering works without a timetable. **Fit my break** is optional.
-- Optional Firestore storage (`STORE=firestore`) and Vercel deployment configuration are implemented and checked locally. Live-project credentials/rules, actual hosted deployment and Gemini Enterprise integration remain separate validation.
+- Google Cloud Firestore and the public HTTPS deployment are connected and verified. Gemini Enterprise is not integrated; meal planning and recovery use explicit rules.
+
+## Live demo and judge access
+
+**[Open BreakBite — https://breakbite-ebon.vercel.app](https://breakbite-ebon.vercel.app)**
+
+Works on a laptop or phone, on any network. No laptop server or Cloudflare tunnel is required. Students can browse without an account, then select **Sign in → New here? Create an account** to order.
+
+Kitchen judges: select **Sign in** and use any account below. Every account has the password **`BreakBiteJudge2026!`**.
+
+| Kitchen | Judge email |
+| --- | --- |
+| Asian Cuisine | `judge.asian-cuisine@breakbite.demo` |
+| Bobanika | `judge.bobanika@breakbite.demo` |
+| Chinese Kitchen | `judge.chinese-kitchen@breakbite.demo` |
+| Japanese Kitchen | `judge.japanese-kitchen@breakbite.demo` |
+| Korean Kitchen | `judge.korean-kitchen@breakbite.demo` |
+| Let's Kopitiam | `judge.lets-kopitiam@breakbite.demo` |
+| Nelson | `judge.nelson@breakbite.demo` |
+| Subway | `judge.subway@breakbite.demo` |
+| Western Kitchen | `judge.western-kitchen@breakbite.demo` |
+
+These are intentionally public **hackathon demo accounts**, limited to their assigned kitchen. The demo dataset is shared and editable; use fictional information. Revoke these accounts before a real pilot. Google service-account keys, VAPID keys and ordinary user credentials are never published.
+
+### Five-minute judge walkthrough
+
+1. Register a student account. Browse campus pickup areas, filter meals and add a meal to the basket.
+2. Choose pickup times and confirm. Payment is at the counter; no online charge occurs.
+3. In a separate browser/private window, sign in to that kitchen. Open **Order queue**, start preparation and mark the order Ready.
+4. On the student account, open **My orders** and display the pickup QR or manual code. The kitchen verifies the code, counter payment and handover to collect the order. Reusing the code must fail.
+5. Check **Order history** in the kitchen and the student's **estimated preparation wait avoided**. Only collected checkouts contribute; the explanation shows the assumptions.
+6. Optional: test independent multi-kitchen fulfilment, delays/cancellation, pause/reopen and **Fit my break**. See the [functional UAT checklist](docs/UAT.md).
+
+### Notifications on your phone
+
+Open the **HTTPS demo link** directly in Chrome/Safari, sign in as a student and open **Inbox → Enable push notifications**. Allow permission, then use **Send test notification**. On iPhone/iPad, first **Add to Home Screen**, then open the app from its icon. Signing out disables that browser's subscription.
+
+Push is enabled with private server keys. Active requests process updates; a GitHub Actions job also requests maintenance about every five minutes while the site is idle. Scheduling and browser/OS delivery can be delayed. Physical-device closed-tab delivery must be confirmed on your phone; Inbox remains the durable record. See [Web Push setup and acceptance](docs/WEB_PUSH.md).
+
+The hosted MVP uses `envs/team-dev` in the shared Firestore database. Automatic APSpace refresh is disabled on hosting; manual timetable entry and `.ics` import work. New photo uploads require a private Blob store; the 45 bundled meal photos work without it.
 
 ## Run
 
@@ -20,11 +59,11 @@ npm start
 ```
 
 - Open `http://127.0.0.1:8080`.
-- `npm run operator` creates a kitchen account. The prompt lists all available kitchen IDs; run it while the server is stopped.
+- `npm run operator` creates a kitchen account. Stop a JSON-backed server first; Firestore permits provisioning while the server runs. Public demo accounts above exist in the hosted database, not a fresh local JSON installation.
 - Students register on the website. Kitchen roles cannot be self-selected.
 - Existing installations: keep `AUTH_MODE=local` and `STORE=file`; back up `.data/` before upgrading.
 - The ready-to-run archive includes `dist/`, so `npm start` and `npm run operator` work without installing build tools.
-- Never share runtime databases, passwords or pickup credentials in the repository.
+- Never share runtime databases, private keys, ordinary user passwords or pickup credentials in the repository. Only the explicitly public judge demo logins above are published.
 
 ## Working features
 
@@ -113,10 +152,11 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. Firebase Admin
 
 ## Verification and guides
 
-- `npm run check`: type checking, **219 automated tests** (218 pass; one opt-in live Firestore test is skipped by default), production build.
+- `npm run check`: type checking, **221 automated tests** (220 pass; one opt-in live Firestore test is skipped by default), production build.
 - `npm run test:firestore-memory` / `test:firestore-suite`: the same suite on an in-memory Firestore stand-in or a real Firestore database. See [Firestore storage](docs/FIRESTORE.md#tests).
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
-- Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
+- Public Vercel HTTPS, real Firestore access, the 9-kitchen/45-meal catalogue, student registration/login/reload/logout, Secure/HttpOnly cookies and CSRF/origin rejection have been verified on the hosted site. Desktop and phone-sized Chrome layouts were checked.
+- Physical phone camera and closed-tab notification delivery, full hosted ordering/collection UAT, Blob uploads and campus-scale load still require acceptance. Browser push-service acceptance is not proof that an OS displayed an alert.
 - [Firestore storage](docs/FIRESTORE.md)
 - [Vercel deployment and hosted acceptance](docs/VERCEL.md)
 - [Background Web Push and Availability tab](docs/WEB_PUSH.md)

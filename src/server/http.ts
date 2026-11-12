@@ -169,7 +169,11 @@ export function createHandler(config: Settings, service: MealService, db?: Datab
                     let result: unknown = { ok: true };
                     if (pathname === '/api/push/subscribe') result = await push.subscribe(actor, input, pushDigest(accounts.session(req).session.csrfToken));
                     else if (pathname === '/api/push/unsubscribe') await push.unsubscribe(actor, input);
-                    else if (pathname === '/api/push/test') result = await push.test(actor, input);
+                    else if (pathname === '/api/push/test') {
+                        result = await push.test(actor, input);
+                        // Await delivery work: a serverless instance may stop after responding.
+                        await push.pump();
+                    }
                     else throw new AppError(404, 'NOT_FOUND', 'Push action not found.');
                     json(res, 200, result); return;
                 }

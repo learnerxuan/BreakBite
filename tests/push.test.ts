@@ -133,6 +133,9 @@ test('HTTP push endpoints enforce session and CSRF, serve SW correctly and expos
     const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify({email:f.account.email,password:'Fixture-long-password'})});const cookie=login.headers.get('set-cookie')!.split(';')[0]!;const {csrfToken}=await login.json() as {csrfToken:string};
     assert.equal((await fetch(base+'/api/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie,Origin:base},body:JSON.stringify({subscription:f.sub})})).status,403);
     assert.equal((await fetch(base+'/api/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie,Origin:base,'X-CSRF-Token':csrfToken},body:JSON.stringify({subscription:f.sub})})).status,200);
+    const deviceId=f.push.status(f.actor).devices[0]!.id;
+    const testResponse=await fetch(base+'/api/push/test',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie,Origin:base,'X-CSRF-Token':csrfToken},body:JSON.stringify({id:deviceId})});
+    assert.equal(testResponse.status,200);assert.equal(f.sent.length,1,'Test delivery must be attempted before the response; serverless has no timer');
     await mkdir('dist-tests/src/public',{recursive:true});await copyFile('public/sw.js','dist-tests/src/public/sw.js');
     const worker=await fetch(base+'/sw.js');assert.equal(worker.status,200);assert.match(worker.headers.get('content-type')!,/javascript/);assert.equal(worker.headers.get('service-worker-allowed'),'/');assert.match(worker.headers.get('cache-control')!,/no-cache/);
 });
@@ -145,7 +148,7 @@ test('worker handles real push event with page closed, and click can only open s
 });
 async function browserFixture() {
     const { webcrypto, createHash } = await import('node:crypto');
-    const pub=generatePushKeys('mailto:admin@example.test').publicKey;let browserSub: Record<string,unknown>|null=null;let devices:Record<string,unknown>[]=[];const calls:string[]=[];let fail=false;
+    const pub=generatePushKeys('mailto:admin@example.test').publicKey;let browserSub: Record<string,unknown>|null=null;let devices:Record<string,unknown>[]=[];const calls:string[]=[];let fail=false, failStatus=false;
     const subscriptionInput=subscription();const id=createHash('sha256').update(subscriptionInput.endpoint).digest('hex');
     const reg={pushManager:{getSubscription:async()=>browserSub,subscribe:async(options:{applicationServerKey:Uint8Array})=>{calls.push('browser-subscribe');browserSub={endpoint:subscriptionInput.endpoint,options:{applicationServerKey:options.applicationServerKey.buffer},toJSON:()=>subscriptionInput,unsubscribe:async()=>{calls.push('browser-unsubscribe');browserSub=null;return true;}};return browserSub;}},getNotifications:async()=>[]};
     const notifications={permission:'default',requestPermission:async()=>{calls.push('permission');notifications.permission='granted';return 'granted';}};
@@ -153,7 +156,7 @@ async function browserFixture() {
     const api=async(route:string,_method?:string,input?:Record<string,unknown>)=>{
         calls.push(route);
         if(route==='/api/push/config')return {configured:true,publicKey:pub};
-        if(route==='/api/push/status')return {configured:true,publicKey:pub,devices:structuredClone(devices)};
+        if(route==='/api/push/status'){if(failStatus)throw new Error('Status unavailable');return {configured:true,publicKey:pub,devices:structuredClone(devices)};}
         if(route==='/api/push/subscribe'){if(fail)throw new Error('Server unavailable');devices=[{id,label:input?.label,expiresAt:Date.now()+86400000}];return {id};}
         if(route==='/api/push/unsubscribe'){devices=[];return {ok:true};}
         return {queued:true};
@@ -162,7 +165,7 @@ async function browserFixture() {
     const sandbox:Record<string,unknown>={api,esc:(s:unknown)=>String(s??''),isSecureContext:true,window:{Notification:notifications,PushManager:{}},Notification:notifications,navigator,matchMedia:()=>({matches:false}),crypto:webcrypto,TextEncoder,Uint8Array,ArrayBuffer,atob,Date,setTimeout,clearTimeout,console};
     vm.runInNewContext(source+'\nglobalThis.functions={refreshPush,pushAction,pushPanel,detachPush};',sandbox);
     type Client={refreshPush:(a:Actor|null)=>Promise<void>;pushAction:(action:string,id:string|undefined,a:Actor|null)=>Promise<string>;pushPanel:()=>string;detachPush:()=>Promise<void>};
-    return {client:sandbox.functions as Client,calls,notifications,sandbox,id,fail:()=>{fail=true;},hasSub:()=>!!browserSub};
+    return {client:sandbox.functions as Client,calls,notifications,sandbox,id,fail:()=>{fail=true;},failStatus:(value:boolean)=>{failStatus=value;},hasSub:()=>!!browserSub};
 }
 test('browser flow asks permission only on click and confirms server registration before enabled state',async()=>{
     const f=await browserFixture();const actor:Actor={id:'a',name:'Student',role:'student'};
@@ -176,4 +179,19 @@ test('browser subscription is rolled back if saving it fails; no false enabled c
 });
 test('insecure and denied browser states explain why push cannot be enabled',async()=>{
     const f=await browserFixture();await f.client.refreshPush({id:'a',name:'Student',role:'student'});f.sandbox.isSecureContext=false;assert.match(f.client.pushPanel(),/HTTPS version/);f.sandbox.isSecureContext=true;f.notifications.permission='denied';assert.match(f.client.pushPanel(),/blocked for this site/);
+});
+test('failed settings refresh never announces success and a successful guest refresh clears the error',async()=>{
+    const f=await browserFixture();const actor:Actor={id:'a',name:'Student',role:'student'};
+    await f.client.refreshPush(actor);f.failStatus(true);
+    await assert.rejects(f.client.pushAction('push-refresh',undefined,actor),/Could not load/);
+    assert.match(f.client.pushPanel(),/Could not load/);
+    await f.client.refreshPush(null);
+    assert.doesNotMatch(f.client.pushPanel(),/Could not load/);
+});
+test('phone HTTP uses public configuration and explains HTTPS instead of a failed authenticated refresh',async()=>{
+    const f=await browserFixture();f.sandbox.isSecureContext=false;
+    await f.client.refreshPush({id:'a',name:'Student',role:'student'});
+    assert.ok(!f.calls.includes('/api/push/status'));
+    assert.match(f.client.pushPanel(),/HTTPS version/);
+    assert.doesNotMatch(f.client.pushPanel(),/Could not load/);
 });
