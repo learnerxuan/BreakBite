@@ -141,6 +141,7 @@ function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
     const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
+    const disclosures = [...root.querySelectorAll<HTMLDetailsElement>('#prep-rail, #savings-explanation')].map(({ id, open }) => ({ id, open }));
     if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
     if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
     const student=s.actor?.role!=='vendor';
@@ -150,6 +151,7 @@ function render(): void {
     ${s.uncertain?'<div class="bb-pending" role="alert">Your last checkout needs confirmation. Keep the same request to avoid duplicate orders. <button class="bb-button secondary" data-action="retry-checkout">Check / retry original checkout</button></div>':''}
     <main id="main" class="bb-main" data-surface="${esc(surface)}">${s.actor?.role==='vendor'?vendor(s):s.view==='orders'?orders(s):s.view==='availability'?availabilityView(s):['saved','planner','inbox'].includes(s.view)?personalView(s):explore(s)}</main><footer class="bb-footer"><strong><span class="bb-footer-brand"><img src="/favicon.svg" alt="">BreakBite.</span><span>Order ahead for your campus break.</span></strong><span>APU student project · Pay at the counter · Pickup estimates shown in MYT (UTC+8)</span></footer>${authDialog()}${checkoutDialog(s)}${menuDialog(s)}${productDialogs(s)}`;
     const nav = root.querySelector<HTMLElement>('.bb-header nav');
+    for (const { id, open } of disclosures) { const detail = document.getElementById(id) as HTMLDetailsElement | null; if (detail) detail.open = open; }
     const selected = nav?.querySelector<HTMLElement>('button.active');
     if(nav && selected){const n=nav.getBoundingClientRect(),b=selected.getBoundingClientRect();if(b.left<n.left)nav.scrollLeft-=n.left-b.left;else if(b.right>n.right)nav.scrollLeft+=b.right-n.right;}
     for(const dialog of root.querySelectorAll<HTMLDialogElement>('dialog')) {

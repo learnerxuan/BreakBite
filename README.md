@@ -113,7 +113,7 @@ TypeScript/native browser modules + CSS + Node.js; **not React**. Firebase Admin
 
 ## Verification and guides
 
-- `npm run check`: type checking, **212 automated tests** (211 pass; one opt-in live Firestore test is skipped by default), production build.
+- `npm run check`: type checking, **215 automated tests** (214 pass; one opt-in live Firestore test is skipped by default), production build.
 - `npm run test:firestore-memory` / `test:firestore-suite`: the same suite on an in-memory Firestore stand-in or a real Firestore database. See [Firestore storage](docs/FIRESTORE.md#tests).
 - Combined ordering, campus-menu, APSpace, QR and notification-settings browser journeys passed over normal localhost HTTP in Chrome at 360/390/768/1440px. QR screenshot decoded independently with OpenCV.
 - Actual phone camera, deployed HTTPS, closed-tab device push, real Google accounts and public deployment remain unverified.
