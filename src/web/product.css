@@ -244,12 +244,20 @@ html{scrollbar-color:#a7b4aa var(--bb-paper)}body{font-size:16px;line-height:1.5
 .bb-filter-line>strong{font-size:12px;min-width:72px}.bb-filter-line .bb-chips{margin:0;padding:0;min-width:0}.bb-diet-buttons{display:flex;flex-wrap:wrap;gap:8px}
 .bb-filter-button{min-height:44px;border:1px solid var(--bb-line);border-radius:7px;background:#fff;color:var(--bb-ink);font-size:12px;font-weight:700;padding:10px 14px}
 .bb-filter-button.active{background:var(--bb-ink);border-color:var(--bb-ink);color:#fff}.bb-diet-options>small{font-size:10px;color:var(--bb-muted);flex-basis:100%;margin-left:90px}
-.bb-browse-filters .bb-allergy-filters{margin:12px;border:1px solid #b34723;border-radius:8px;background:#fff8f2;overflow:hidden}
+.bb-browse-filters .bb-allergy-filters{margin:12px;padding:0;border:1px solid #dfbda9;border-radius:10px;background:#fffaf6;overflow:hidden}
 .bb-browse-filters .bb-allergy-filters>summary{min-height:56px;padding:12px 14px;display:flex;gap:12px;justify-content:space-between;align-items:center;list-style:none;cursor:pointer;color:#963615}
 .bb-browse-filters .bb-allergy-filters>summary::-webkit-details-marker{display:none}
 .bb-allergy-title{display:flex;gap:8px;align-items:center;font-size:13px}.bb-allergy-title .icon{color:#ac3f1b;flex-shrink:0}
-.bb-allergy-cta{display:flex;align-items:center;gap:12px;font-size:12px;font-weight:750;text-decoration:underline;text-underline-offset:4px}.bb-allergy-cta b{font-size:20px;line-height:1}
-.bb-allergy-filters[open] .bb-allergy-cta b{transform:rotate(180deg)}.bb-allergy-content{padding:0 14px 14px}.bb-allergy-content>p{font-size:12px;line-height:1.6;margin:0 0 12px}.bb-allergy-options button{min-height:44px}
+.bb-allergy-cta{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 12px;border-radius:7px;background:#b44220;color:#fff;font-size:12px;font-weight:750;flex-shrink:0}
+.bb-allergy-open{display:none}.bb-allergy-filters[open] .bb-allergy-closed{display:none}.bb-allergy-filters[open] .bb-allergy-open{display:inline}
+.bb-allergy-chevron{flex-shrink:0}.bb-allergy-filters[open] .bb-allergy-chevron{transform:rotate(180deg)}
+.bb-allergy-content{padding:0 14px 16px}.bb-allergy-content>p{font-size:12px;line-height:1.6;margin:0 0 12px;max-width:800px}
+.bb-browse-filters .bb-allergy-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;padding:0}
+.bb-browse-filters .bb-allergy-options button{display:flex;align-items:center;gap:9px;min-height:44px;padding:10px;border-radius:7px;text-align:left;font-size:12px;color:var(--bb-ink)}
+.bb-allergen-check{display:grid;place-items:center;width:17px;height:17px;flex-shrink:0;border:1px solid #7a877d;border-radius:4px;background:#fff}.bb-allergen-check .icon{width:13px;height:13px;opacity:0}
+.bb-browse-filters .bb-allergy-options button.active{background:var(--bb-ink);border-color:var(--bb-ink);color:#fff}.bb-allergy-options button.active .bb-allergen-check{border-color:#fff;background:transparent}.bb-allergy-options button.active .bb-allergen-check .icon{opacity:1}
+.bb-browse-filters .bb-allergy-options button.clear{grid-column:1/-1;justify-content:center;background:transparent;color:#a13b1c}
+@media(max-width:600px){.bb-browse-filters .bb-allergy-filters>summary{display:grid;grid-template-columns:1fr;gap:10px}.bb-browse-filters .bb-allergy-cta{max-width:none;width:100%;min-height:44px;justify-content:space-between;font-size:12px}.bb-browse-filters .bb-allergy-content{padding:0 12px 12px}.bb-browse-filters .bb-allergy-options{grid-template-columns:repeat(2,minmax(0,1fr))}.bb-browse-filters .bb-allergy-options button{font-size:11px;padding:9px;gap:7px}}
 .bb-filter-reset{padding:0 16px 8px}.bb-filter-reset button{min-height:44px}
 .bb-prep-filter>p{font-size:11px;line-height:1.5;margin:0 0 12px}.bb-prep-bars{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;padding-bottom:4px}
 .bb-prep-bars button{min-height:68px;padding:10px 2px;border:1px solid transparent;border-radius:6px;background:#eaf1e7;color:var(--bb-ink);font-variant-numeric:tabular-nums}

@@ -190,7 +190,7 @@ A white, fine-bordered preparation panel offers maximum-estimate buttons for 1�
 
 ### Allergy Control
 
-Use a warm orange-tinted background, a strong orange outline, a warning icon, bold “Allergy filters”, an underlined “Choose allergens to avoid” action and a directional chevron. The whole disclosure is clickable and at least 56px high. Selected counts remain visible while collapsed. Expansion and focus survive refresh; unknown or unreviewed information is excluded by active allergy/diet filters. Browse filters do not overwrite saved food preferences.
+Use a warm orange-tinted surface, a warning icon, bold “Allergy filters” and a solid orange action with an SVG chevron. The action changes to “Hide allergens” when expanded. Use aligned checkbox-style toggle buttons with visible checked states, switching to two columns on phones. The whole disclosure is clickable and at least 56px high; phone actions are at least 44px. Selected counts remain visible while collapsed. Expansion and focus survive refresh; unknown or unreviewed information is excluded by active allergy/diet filters. Browse filters do not overwrite saved food preferences.
 
 ### Meal Register
 
