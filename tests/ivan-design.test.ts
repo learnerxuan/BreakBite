@@ -21,7 +21,7 @@ test('kitchen-name search matches the redesigned search prompt and excludes clos
     assert.match(kitchenFilter, /asian-cuisine/);
     assert.doesNotMatch(kitchenFilter, /bobanika|chinese-kitchen/);
 });
-test('the dense meal design retains current safety, stock, pickup and mobile-basket behaviour without restoring removed labels', () => {
+test('the photo-led food cards retain current safety, stock, pickup and mobile-basket behaviour without restoring removed labels', () => {
     const state = fixture();
     state.actor = { id: 'design-student', name: 'Design Student', role: 'student' };
     state.items[0]!.stock = 0;

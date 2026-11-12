@@ -84,7 +84,7 @@ The visual world is flat, practical and specific to campus life. It rejects deco
 
 **Key Characteristics:**
 - Warm ivory ground with deep green structure and sparse orange action color.
-- Dense, hairline-separated registrations rather than card collections.
+- Photo-led meal cards, restored at the project owner's request, with clear operational details inside each card.
 - Preparation time expressed as a shared visual scale and tabular figures.
 - Food imagery and plain language balancing the technical timing grammar.
 - Safety, stock and kitchen state remain visible at the point of choice. Stored sample provenance does not imply operator verification.
@@ -192,9 +192,9 @@ A white, fine-bordered preparation panel offers maximum-estimate buttons for 1�
 
 Use a warm orange-tinted surface, a warning icon, bold “Allergy filters” and a solid orange action with an SVG chevron. The action changes to “Hide allergens” when expanded. Use aligned checkbox-style toggle buttons with visible checked states, switching to two columns on phones. The whole disclosure is clickable and at least 56px high; phone actions are at least 44px. Selected counts remain visible while collapsed. Expansion and focus survive refresh; unknown or unreviewed information is excluded by active allergy/diet filters. Browse filters do not overwrite saved food preferences.
 
-### Meal Register
+### Meal Cards
 
-Desktop meals are rows separated by hairlines, with aligned preparation and price columns. Mobile keeps the image, food-safety tags, full allergen note, preparation estimate, price and Add action visible. The user's requested removal of visible sample labels is preserved; unknown dietary information and stored provenance remain intact. Mid-width desktop rows rearrange their preparation and price blocks to leave the meal description readable beside the basket.
+Use large food photographs with prep badges at the upper left and a 44px favourite control at the upper right. Details sit below the image in a white rounded card: kitchen, meal name, description, dietary/allergen information, ingredient action, stock, live kitchen/pickup status, then price and Add. Price/actions align at the bottom of each row. Use three desktop columns, two at intermediate widths and one on phones. Keep allergen notes fully visible and preserve the user's removal of sample labels; stored provenance remains unchanged.
 
 ## Do's and Don'ts
 
@@ -207,7 +207,7 @@ Desktop meals are rows separated by hairlines, with aligned preparation and pric
 
 ### Don't:
 - **Don't** reintroduce a decorative marketing hero above the ordering task.
-- **Don't** turn every result into an isolated rounded card or add shadows without a state purpose.
+- **Don't** replace the requested photo-led meal cards with compact list rows; keep other operational surfaces restrained.
 - **Don't** hide or clip allergen warnings and unknown dietary states on narrow screens.
 - **Don't** invent nutrition, certification, availability or waiting-time claims.
 - **Don't** use orange as a broad background treatment; its scarcity makes actions clear.

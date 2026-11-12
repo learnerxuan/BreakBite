@@ -1,3 +1,9 @@
+# Restored photo-led food cards — 12 November 2026
+
+- Restored the requested student meal-card layout: large top image, prep-time badge, favourite action, details/allergens/stock, live kitchen/pickup status and bottom-aligned price/Add. Desktop uses three columns, intermediate widths two and phones one. Current campus-area browsing, filters, savings, mobile basket and all backend behaviour remain intact; previously removed sample labels stay hidden.
+- `npm run check`: **218 passed, 1 opt-in live-project skip**, with strict TypeScript and build passing. Updated existing browser selectors for the card grid and prep badges; the prep-limit check now also requires at least one result.
+- Focused read-only Chrome checks at 360/390/600/640/768/860/861/900/1024/1200/1440px passed image sizing, prep badges, status placement, 44px controls, no horizontal overflow, adding to the mobile basket and ingredient-dialog access. Desktop/phone screenshots were visually inspected. The existing Wi-Fi testing URL returned HTTP 200; no accounts/orders were changed.
+
 # Allergy panel polish and prep-filter wording — 12 November 2026
 
 - Removed inherited nested padding, replaced the rotated text arrow with an SVG chevron, and added a solid action that changes to “Hide allergens” when expanded. Replaced uneven large pills with aligned, checked-state toggle tiles and a two-column phone layout. Filtering, review guards and saved preferences are unchanged.

@@ -30,7 +30,8 @@ with sync_playwright() as p:
     expect(page.locator('.bb-cart-line')).to_contain_text('Nasi lemak ayam')
     page.locator('#prep-filter-3').click()
     expect(page.locator('#prep-filter-3')).to_have_attribute('aria-pressed','true')
-    assert page.locator('.bb-meal-time strong').evaluate_all('(nodes)=>nodes.every(n=>Number(n.textContent)<=3)')
+    assert page.locator('.bb-prep').count()>0
+    assert page.locator('.bb-prep').evaluate_all('(nodes)=>nodes.every(n=>parseInt(n.textContent,10)<=3)')
     page.get_by_role('button',name='Clear menu filters',exact=True).click()
     page.get_by_role('button',name='Vegetarian',exact=True).click()
     expect(page.get_by_role('heading',name='No meals match.',exact=True)).to_be_visible()
