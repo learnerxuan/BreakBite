@@ -14,7 +14,7 @@ This inventory records what the project currently knows about shipping raster as
 
 - **Files:** `public/images/cafeterias/*.jpg`
 - **Origin:** Restaurant/cafeteria photographs supplied to the project team for development.
-- **Use:** Retained as possible future kitchen banners; not used as dish photographs.
+- **Use:** Existing Asian Cuisine, Nelson and Subway counter photos appear in pickup-area navigation for Cafeteria, Atrium and Above Centre Point. Other supplied photos can represent their current kitchen group when the open-kitchen set changes. These are counter photos, not dish photographs or proof of vendor endorsement.
 - **Permission status:** Repository documentation does not establish vendor approval or a public redistribution licence. Obtain and record permission before public deployment.
 
 ## Application icons

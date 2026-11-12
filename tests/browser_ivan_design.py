@@ -20,32 +20,27 @@ with sync_playwright() as p:
     expect(page.get_by_text('Sample menu',exact=False)).to_have_count(0)
     rail=page.locator('#prep-rail')
     assert rail.get_attribute('open') is None, 'Phone comparison must start collapsed'
-    assert page.locator('.bb-meal').first.bounding_box()['y'] < 760, 'Optional comparison pushes all food below the phone viewport'
+    expect(page.locator('.bb-area-strip')).to_be_visible()
     page.screenshot(path=str(out/'guest-mobile.png'))
     rail.locator('summary').click()
     expect(rail).to_have_attribute('open','')
     page.wait_for_timeout(5600)
     expect(rail).to_have_attribute('open','')
     expect(page.locator('#prep-rail-toggle')).to_be_focused()
-    assert page.evaluate(r'''()=>[...document.querySelectorAll('.bb-time-marker')].every(marker=>{
-        const minute=marker.className.match(/bb-time-at-(\d+)/)[1];
-        const tick=document.querySelector(`[data-prep-minute="${minute}"]`);
-        const a=marker.getBoundingClientRect(),b=tick.getBoundingClientRect();
-        return Math.abs(a.x+a.width/2-b.x-b.width/2)<1.5;
-    })'''), 'Counts do not align with their preparation-minute labels'
-    expect(rail.locator('[data-prep-minute="12"]')).to_have_text('12+')
+    expect(rail.locator('[data-max-prep="all"] strong')).to_have_text('12+')
+    expect(rail.locator('[data-max-prep]')).to_have_count(12)
     rail.locator('summary').click()
     page.wait_for_timeout(5600)
     assert rail.get_attribute('open') is None, 'Polling reopened the optional comparison'
     page.locator('#search-input').fill('  ASIAN CUISINE  ')
-    page.locator('#search-form').get_by_role('button',name='Search',exact=True).click()
+    page.locator('#search-form').get_by_role('button',name='Find meals',exact=True).click()
     expect(page.locator('.bb-meal')).to_have_count(5)
     expect(page.locator('.bb-menu-heading')).to_contain_text('5 menu items shown')
     page.locator('#search-input').fill('does-not-exist')
-    page.locator('#search-form').get_by_role('button',name='Search',exact=True).click()
+    page.locator('#search-form').get_by_role('button',name='Find meals',exact=True).click()
     expect(page.get_by_role('heading',name='No meals match.',exact=True)).to_be_visible()
     page.locator('#search-input').fill('')
-    page.locator('#search-form').get_by_role('button',name='Search',exact=True).click()
+    page.locator('#search-form').get_by_role('button',name='Find meals',exact=True).click()
     first=page.locator('.bb-meal').first
     expect(first).to_contain_text('Contains: eggs, peanuts.')
     expect(first.locator('.bb-allergen-note')).to_be_visible()
@@ -77,4 +72,4 @@ with sync_playwright() as p:
     expect(page.get_by_role('button',name='Explore',exact=True)).to_have_attribute('aria-current','page')
     assert not errors,errors
     browser.close()
-    print('PASS compact design, phone comparison defaults and polling, calibrated minute markers, kitchen search, current food labels/status/savings, ingredients, navigation, responsive search and basket boundaries.')
+    print('PASS compact design, phone prep-filter defaults and polling, kitchen search, current food labels/status/savings, ingredients, navigation, responsive search and basket boundaries.')
