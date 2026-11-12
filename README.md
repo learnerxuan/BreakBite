@@ -8,6 +8,39 @@
 - Ordinary ordering works without a timetable. **Fit my break** is optional.
 - Google Cloud Firestore and the public HTTPS deployment are connected and verified. Gemini Enterprise is not integrated; meal planning and recovery use explicit rules.
 
+## Project summary
+
+BreakBite is a campus food pre-ordering platform that helps APU students make better use of short breaks. Students browse meals, see kitchen workload and pickup estimates, and order across multiple kitchens in one checkout. Kitchens manage preparation, delays and collection through a dedicated dashboard, with QR or manual-code verification at pickup. After collection, the app displays an explained estimate of food-preparation waiting time avoided. Built with TypeScript and Google Cloud Firestore, and deployed on Vercel, BreakBite brings meal planning, kitchen operations and order tracking into one mobile-friendly experience.
+
+## Problem statement
+
+A student's break must fit choosing food, ordering, waiting for preparation, collecting and eating before the next class. Ordering only after reaching a counter leaves preparation until the student is already waiting. Choosing meals from different kitchens adds separate orders and pickup coordination. Students also need current stock, dietary information and a realistic pickup estimate before committing to a meal.
+
+Kitchens need a manageable preparation queue, control over stock and incoming orders, and a way to communicate delays. A campus ordering system must respect kitchen capacity and keep students informed when the original pickup plan changes.
+
+## Solution
+
+BreakBite lets students order before arriving so kitchens can prepare while students continue with their day. Students build one basket across kitchens, review capacity-checked pickup windows and collect each kitchen's order separately, paying at its counter. Optional **Fit my break** checks a meal plan against a student's available break and budget; ordinary ordering needs no timetable.
+
+Kitchen dashboards connect preparation, stock, delays and verified handover to the student's order status. After collection, BreakBite calculates an **estimated preparation wait avoided**, adjusting for readiness lateness and avoiding double counting when kitchens prepare in parallel. This makes the project's main benefit visible without claiming to measure physical queues or walking time.
+
+## Features
+
+| Feature | What it does |
+| --- | --- |
+| Campus meal discovery | Browse 45 project-menu items from nine kitchens by pickup area, kitchen, meal type, spice and menu preparation estimate. View stock, prices and ingredient information. |
+| Estimated time saved | Show a private estimate of preparation wait avoided after collection, with the calculation explained. Cancelled or uncollected orders add nothing. |
+| One basket, multiple kitchens | Reserve separate kitchen pickups in one checkout. All reservations commit together or none do; each kitchen then fulfils independently. |
+| Kitchen availability | Show Open/Delayed/Closed status, labelled Preparing/Scheduled/Ready counts and pickup estimates. Stale counts are hidden; walk-ins are not counted. |
+| Optional Fit my break | Check a basket against break times, food budget and eating time. Manual timetable entry and `.ics` import work on the hosted demo. |
+| Dietary preferences | Filter using reviewed kitchen declarations and enforce saved restrictions again at checkout and replacements. Unknown information does not satisfy an active restriction. |
+| Order tracking and updates | Follow each kitchen's order, receive private Inbox notices and opt in to supported browser push. Physical-device delivery still needs acceptance testing. |
+| Verified pickup | Use a private QR or manual code. Kitchen staff confirm payment and handover; collection consumes the credential so it cannot be reused. |
+| Delay and cancellation handling | Support eligible per-kitchen cancellation, free earlier capacity and kitchen-approved replacement meals that need student consent. Sibling orders stay independent. |
+| Kitchen dashboard | Manage stock, preparation, delays, pickup and order history. Close a kitchen to stop new orders and hide its meals; existing orders remain actionable. |
+| Saved meals and repeat orders | Save favourites and usual baskets, then review repeat orders against current prices, stock, dietary information and pickup capacity. |
+| Durable cloud storage | Store accounts, sessions, menus and orders in Google Cloud Firestore. Student-scoped retry keys recover uncertain checkouts without duplicating orders. |
+
 ## Live demo and judge access
 
 **[Open BreakBite — https://breakbite-ebon.vercel.app](https://breakbite-ebon.vercel.app)**
@@ -65,22 +98,6 @@ npm start
 - The ready-to-run archive includes `dist/`, so `npm start` and `npm run operator` work without installing build tools.
 - Never share runtime databases, private keys, ordinary user passwords or pickup credentials in the repository. Only the explicitly public judge demo logins above are published.
 
-## Working features
-
-| Area | Implemented behaviour |
-| --- | --- |
-| Ordering | Guest browsing, multiple kitchens in one basket, independent pickup windows/codes, atomic all-or-nothing checkout, durable retry recovery. |
-| QR pickup | Private QR per kitchen order; merchant camera/USB scan or manual-code fallback; ready-state, kitchen, payment and one-use checks. |
-| Saved meals | Favourites, recently ordered meals, named usual baskets, rename/remove and repeat ordering with current prices, food information and fresh slots. |
-| Food information | Vendor-entered ingredients, spice, dietary declarations, contains/may-contain warnings and evidence references; saved student restrictions and explicit unknown states. |
-| Campus content | Editable kitchen campus/location/menu source, permission-confirmed local photograph uploads, responsive APU-focused interface. |
-| Availability | Dedicated **Availability** tab, separate from Explore. Online preparing/scheduled/ready counts, kitchen status and meal-specific pickup estimates; no claim to measure physical queues or cooking progress. |
-| Collection policies | Configurable ordering/cancellation cutoffs, snapshotted order rules, server-generated ready/due/overdue reminders, merchant-confirmed uncollected closure and corrections. |
-| Timetable | Manual classes and `.ics` imports, plus opt-in APSpace import by typed intake code and group. Review classes once, then use saved gaps in the planner or basket. Changes require review. |
-| Deadline help | Move a not-yet-preparing order into genuinely free earlier capacity, or request reviewed alternatives. Other students are never pushed back. |
-| Time saved | Prominent, private estimate of preparation wait avoided on collected checkouts; snapshotted preparation times, lateness adjustment and no double counting across parallel kitchens. |
-| Kitchen operations | Menu/stock editing, preparation queue, pause/reopen, capacity settings, delays, consent-based alternatives, collection and operation history. |
-
 ## Important workflow rules
 
 - Each kitchen receives its own child order, amount due and collection credential.
@@ -99,7 +116,7 @@ npm start
 
 - QR camera scanning needs HTTPS (or computer localhost), permission and a browser with `BarcodeDetector` QR support. USB scanner text and the original manual pickup-code form remain available where camera decoding is unsupported.
 - QR generation is local. No credential is sent to an external QR image service; no camera image is uploaded.
-- Reminders are generated by the running server every 15 seconds and stored in a private account inbox.
+- Reminders are stored in a private account Inbox. A local server checks every 15 seconds; hosted requests also run maintenance, with best-effort scheduled checks about every five minutes while idle.
 - **Background Web Push is implemented:** opt in from Inbox, test delivery, disable this browser or remove another device. Requires private VAPID keys, HTTPS/browser support, permission and a running server with outbound Internet access.
 - Follow [Web Push setup and acceptance](docs/WEB_PUSH.md). Real closed-tab device delivery still needs verification on your deployment; SMS/email are not implemented.
 - Calendar import expands up to 90 days and 1,000 occurrences. Supported recurrences: DAILY/WEEKLY, interval/count/until/weekdays, exclusions/additions and individual changes.
@@ -108,7 +125,7 @@ npm start
 
 ## Real campus data
 
-- The starter catalogue includes nine supplied-photo APU sample vendors, with five project-purpose items each. Menu cards use AI-generated illustrative dish images, clearly credited as samples; the supplied restaurant photographs are retained separately for future kitchen banners. Menus, ingredients and illustrative images remain sample data until reviewed; visible card badges are hidden at the project owner's request.
+- The starter catalogue includes nine APU sample kitchens with five project-purpose items each. Supplied campus/restaurant photographs appear in pickup-area browsing; dish photos are AI-generated illustrations. Menu prices, preparation times and ingredients remain sample data until reviewed by the kitchens; visible card badges are hidden at the project owner's request.
 - Operators can replace menus, upload owned/licensed photographs, record the review source and confirm their kitchen data.
 - Card sample badges are hidden at the project owner's request; seed provenance remains stored. Obtain actual vendor confirmation before claiming menus, dietary information or images are verified.
 - No fabricated nutrition, halal certification, allergy guarantees, time-saving percentage or university endorsement.
