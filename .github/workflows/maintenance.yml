@@ -1,0 +1,23 @@
+name: Hosted pickup reminders
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: hosted-maintenance
+  cancel-in-progress: false
+jobs:
+  maintain:
+    if: vars.BREAKBITE_MAINTENANCE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Generate reminders and send pending push
+        env:
+          CRON_SECRET: ${{ secrets.BREAKBITE_CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET" || { echo 'Maintenance secret is missing'; exit 1; }
+          curl --fail-with-body --silent --show-error --max-time 55 --retry 2 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            https://breakbite-ebon.vercel.app/api/internal/maintenance

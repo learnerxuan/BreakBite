@@ -202,6 +202,10 @@ Use a deep-green impact panel with a cream statistic tile and restrained orange 
 
 ## Do's and Don'ts
 
+### Kitchen availability
+
+Use three labelled count tiles: Preparing in warm orange, Scheduled in blue, Ready in green. Keep numeric counts visible without relying on colour. Show the pickup estimate separately and the kitchen's update time below. Explain scheduled orders and untracked walk-ins once above the grid, rather than repeating a paragraph on every card. Hide counts and estimates when stale or offline.
+
 ### Do:
 - **Do** open food-finding surfaces on the task, filters and comparable meal data.
 - **Do** keep preparation figures, locations, prices and dietary states scannable together.

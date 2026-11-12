@@ -16,7 +16,7 @@ with sync_playwright() as pw:
     login(page,f'notifications-{uuid.uuid4().hex[:8]}@example.test',register=True)
     page.get_by_role('button',name='Inbox',exact=True).click();expect(page.get_by_role('heading',name='Inbox',exact=True)).to_be_visible();expect(page.locator('.bb-push-panel')).to_be_visible()
     expect(page.get_by_role('button',name='Enable push notifications',exact=True)).to_be_disabled()
-    expect(page.locator('.bb-push-panel')).to_contain_text('not configured')
+    expect(page.locator('.bb-push-panel')).to_contain_text('not enabled')
     for w in [360,390,768,1440]:
         page.set_viewport_size({'width':w,'height':1000});overflow(page)
         if w in [390,1440]:page.screenshot(path=str(out/f'inbox-{w}.png'),full_page=True)

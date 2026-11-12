@@ -328,3 +328,25 @@ html{scrollbar-color:#a7b4aa var(--bb-paper)}body{font-size:16px;line-height:1.5
 .bb-impact-journey{border-left:1px solid #527262;padding-left:24px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:13px}.bb-impact-journey>p{font-size:10px;color:#c7dacd;margin:0 0 2px}.bb-impact-journey>div{display:flex;align-items:center;gap:10px}.bb-impact-journey>div>span{width:34px;height:34px;border:1px solid #698672;border-radius:10px;background:#244d3e;display:grid;place-items:center;flex-shrink:0}.bb-impact-journey .icon{width:17px;height:17px;color:#ffc49d}.bb-impact-journey strong{font-size:12px;line-height:1.4;font-weight:650}.bb-impact-journey small{display:block;font-size:10px;color:#c7dacd;font-weight:400;margin-top:2px}
 @media(max-width:1100px){.bb-impact.bb-impact-refined{grid-template-columns:180px minmax(0,1fr);gap:24px;padding:24px}.bb-impact-journey{display:none}}
 @media(max-width:600px){.bb-impact.bb-impact-refined{grid-template-columns:96px minmax(0,1fr);gap:14px;padding:16px;border-radius:18px;margin:16px 0}.bb-impact-refined .bb-impact-number{padding:14px 10px;border-radius:12px;gap:12px;align-self:stretch}.bb-impact-refined .bb-impact-estimate{font-size:10px;gap:5px;align-items:flex-start;line-height:1.35}.bb-impact-estimate .icon{width:15px;height:15px}.bb-impact-refined .bb-impact-number>strong{font-size:43px;letter-spacing:-2px;gap:3px}.bb-impact-refined .bb-impact-number strong span{font-size:15px}.bb-impact-refined .bb-impact-number>strong.bb-impact-long-total{font-size:22px;letter-spacing:-1px}.bb-impact-refined .bb-impact-number-note{font-size:10px;line-height:1.4}.bb-impact-refined .bb-impact-story h2{font-size:18px;letter-spacing:-.3px;margin-bottom:7px}.bb-impact-refined .bb-impact-story>p:not(.bb-impact-eyebrow){font-size:12px;line-height:1.5;margin:7px 0}.bb-impact-refined .bb-impact-eyebrow{font-size:10px;line-height:1.4;margin:0 0 6px}.bb-impact-meta{margin:10px 0 4px;gap:5px}.bb-impact-meta>span{font-size:10px;padding:4px 6px}.bb-impact-meta>small{font-size:9px}.bb-impact-refined .bb-impact-story summary{min-height:44px;font-size:11px;line-height:1.4}.bb-impact-refined .bb-impact-story details p{font-size:11px}}
+
+/* Kitchen availability: labelled counts remain meaningful without colour. */
+.bb-load-explainer{font-size:13px;color:var(--bb-muted);line-height:1.6;margin:0 0 20px;max-width:780px}
+.bb-load-card{padding:22px;border-color:#dce4d9;box-shadow:0 3px 0 #e9ede4}
+.bb-load-card h3{font-size:19px;letter-spacing:-.3px}
+.bb-kitchen-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:22px 0}
+.bb-kitchen-counts>div{padding:14px 12px;border-radius:10px;border:1px solid transparent;display:flex;flex-direction:column;gap:6px}
+.bb-kitchen-counts dt{font-size:12px;font-weight:650;display:flex;align-items:center;gap:6px}
+.bb-kitchen-counts dt:before{content:'';width:6px;height:6px;background:currentColor;border-radius:50%;flex-shrink:0}
+.bb-kitchen-counts dd{font-size:30px;line-height:1.1;font-weight:800;font-variant-numeric:tabular-nums;margin:0;overflow-wrap:anywhere}
+.bb-kitchen-counts .preparing{background:#fff1e5;color:#9a410d;border-color:#f5dac3}
+.bb-kitchen-counts .scheduled{background:#eef2fc;color:#385a96;border-color:#d8e1f4}
+.bb-kitchen-counts .ready{background:#eaf3e6;color:#285738;border-color:#d1e4c9}
+.bb-kitchen-pickup{border-top:1px solid var(--bb-line);padding:16px 0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bb-kitchen-pickup>span{font-size:13px;color:var(--bb-muted)}
+.bb-kitchen-pickup>strong{font-size:24px;white-space:nowrap;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.bb-kitchen-pickup strong small{font-size:10px;letter-spacing:0;font-weight:500;color:var(--bb-muted)}
+.bb-kitchen-updated{font-size:11px;color:var(--bb-muted)}
+.bb-push-panel .bb-actions{gap:12px;align-items:center;flex-wrap:wrap;margin:20px 0 14px}
+.bb-push-panel .bb-actions>.bb-text-button{min-height:44px;padding:10px 14px;border:1px solid var(--bb-line);border-radius:10px;background:#fff}
+.bb-push-panel .bb-actions>.bb-button{min-height:44px}
+@media(max-width:600px){.bb-load-card{padding:18px}.bb-kitchen-counts>div{padding:12px 9px}.bb-kitchen-counts dt{font-size:11px}.bb-kitchen-pickup{align-items:flex-start}.bb-kitchen-pickup>span{max-width:140px}.bb-push-panel .bb-actions{align-items:stretch}.bb-push-panel .bb-actions>.bb-button{width:100%}}
