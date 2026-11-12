@@ -196,6 +196,10 @@ Use a warm orange-tinted surface, a warning icon, bold “Allergy filters” and
 
 Use large food photographs with prep badges at the upper left and a 44px favourite control at the upper right. Details sit below the image in a white rounded card: kitchen, meal name, description, dietary/allergen information, ingredient action, stock, live kitchen/pickup status, then price and Add. Price/actions align at the bottom of each row. Use three desktop columns, two at intermediate widths and one on phones. Keep allergen notes fully visible and preserve the user's removal of sample labels; stored provenance remains unchanged.
 
+### Personal Time Saved
+
+Use a deep-green impact panel with a cream statistic tile and restrained orange accents. The server's exact estimated minutes remain the focal point, supported by a collected-checkout count and an expandable calculation explanation. A small desktop illustration explains ordering ahead, kitchen preparation and collection; it is decorative, not a live progress tracker. Hide this illustration at narrower widths and keep the number/explanation legible. Zero and large totals must fit without invented goals, percentages or achievements.
+
 ## Do's and Don'ts
 
 ### Do:

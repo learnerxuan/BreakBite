@@ -1,3 +1,9 @@
+# Refreshed time-saved panel and local port — 12 November 2026
+
+- Reworked the personal impact panel with a cream statistic tile, collected-checkout badge, clearer text hierarchy and a decorative order-ahead/preparation/collection illustration. Retained the exact server total, student-only visibility, zero state and calculation explanation. Large totals use smaller type; the illustration is hidden on narrow screens. No savings formula or backend behaviour changed.
+- `npm run check`: **218 passed, 1 opt-in live-project skip**, strict TypeScript and build passed. After adjusting the long-total font, the production build and focused browser checks passed. Synthetic zero, five-minute and 12,345-minute render previews were checked at 360/390/600/768/900/1100/1440px, including overflow and explanation access; desktop/phone screenshots were visually inspected. These previews did not use real account data or claim real savings.
+- Moved this workspace's ignored `.env` from port 8080 to **3000**, updating all exact laptop/Wi-Fi origins. Stopped the verified sole JSON writer, saved a private backup, then restarted one hidden server. Laptop health and Wi-Fi HTTP requests succeeded; account/order identifiers match the stopped-server backup. Port/origin changes are local configuration, not committed credentials or a change to the repository's default port. Physical-phone access remains device acceptance.
+
 # Restored photo-led food cards — 12 November 2026
 
 - Restored the requested student meal-card layout: large top image, prep-time badge, favourite action, details/allergens/stock, live kitchen/pickup status and bottom-aligned price/Add. Desktop uses three columns, intermediate widths two and phones one. Current campus-area browsing, filters, savings, mobile basket and all backend behaviour remain intact; previously removed sample labels stay hidden.
