@@ -60,6 +60,10 @@ with sync_playwright() as p:
     expect(page.locator('.bb-impact')).to_be_visible()
     for width in [360,390,600,640,768,860,861,900,1024,1440]:
         page.set_viewport_size({'width':width,'height':1100 if width>600 else 844})
+        if page.locator('#allergy-filters').get_attribute('open') is None:
+            page.locator('#allergy-filter-toggle').click()
+        assert page.locator('.bb-allergy-options').evaluate('e=>getComputedStyle(e).display')=='grid'
+        assert page.locator('.bb-allergy-options button').evaluate_all('(buttons)=>buttons.every(b=>{const r=b.getBoundingClientRect(),p=b.closest(".bb-allergy-content").getBoundingClientRect();return r.left>=p.left&&r.right<=p.right+1&&r.height>=44})'),'Allergen choices overflow or have small touch targets'
         overflow(page)
         if width<=600:
             assert page.locator('.bb-area-card').evaluate_all('(cards)=>cards.every(c=>{const r=c.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})')

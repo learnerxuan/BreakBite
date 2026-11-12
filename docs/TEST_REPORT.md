@@ -1,3 +1,9 @@
+# Allergy panel polish and prep-filter wording — 12 November 2026
+
+- Removed inherited nested padding, replaced the rotated text arrow with an SVG chevron, and added a solid action that changes to “Hide allergens” when expanded. Replaced uneven large pills with aligned, checked-state toggle tiles and a two-column phone layout. Filtering, review guards and saved preferences are unchanged.
+- Renamed the prep section “Filter by preparation time”. A selected limit now explains that it shows menu estimates at or below that number and that pickup estimates also include the kitchen's current orders. It remains a browsing filter, not an eight-minute pickup promise or the collected-order time-saved calculation.
+- `npm run check`: **218 passed, 1 opt-in live-project skip**, strict TypeScript and production build passed. Focused read-only guest browser checks cover 360–1440px layouts, expanded-panel geometry, 44px options, selected icons, polling/focus and the eight-minute explanation; desktop/phone screenshots were visually inspected. The Wi-Fi URL returned HTTP 200. Existing localhost accounts/orders were untouched.
+
 # Screenshot reference, campus photos and clear filters — 12 November 2026
 
 - Rechecked remote branches and history: the supplied screenshot's photo strip was absent from the pushed `ivan_branch` (`2544f55`). Recreated that reference with existing Asian Cuisine, Nelson and Subway counter photos, current location groups, full-width search, grouped meal/diet controls and a maximum-preparation selector. Used the current nine-kitchen/45-item catalogue rather than copying the screenshot's old eight-item counts. Six initial kitchens are in Cafeteria, one in Atrium, and two above Centre Point.

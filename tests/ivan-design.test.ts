@@ -45,7 +45,7 @@ test('the optional preparation comparison labels 12-plus honestly and is not a p
     assert.match(html, /<details id="prep-rail"/);
     assert.match(html, /data-max-prep="all"[^>]*aria-label="Any preparation time · 3 menu items"/);
     assert.match(html, /<strong>12\+<\/strong>/);
-    assert.match(html, /not pickup availability/);
+    assert.match(html, /Pickup estimates also include the kitchen’s current orders/);
     state.maxPrepMinutes = 11;
     assert.equal(html.match(/<article class="bb-meal">/g)?.length, 3);
     assert.equal(explore(state).match(/<article class="bb-meal">/g)?.length, 1);
