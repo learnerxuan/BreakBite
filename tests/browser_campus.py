@@ -74,5 +74,5 @@ with sync_playwright() as playwright:
     expect(first).to_contain_text('Cancelled')
     expect(sibling).to_contain_text('Confirmed')
     assert not errors, errors
-    print('PASS 9 kitchens, all 45 JPEGs, sample labels, fail-closed allergy filters, combined mobile basket, two added-kitchen checkout and independent cancellation over browser HTTP.')
+    print('PASS 9 kitchens, all 45 JPEGs, requested label removal, fail-closed allergy filters, combined mobile basket, two added-kitchen checkout and independent cancellation over browser HTTP.')
     browser.close()

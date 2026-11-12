@@ -87,7 +87,7 @@ The visual world is flat, practical and specific to campus life. It rejects deco
 - Dense, hairline-separated registrations rather than card collections.
 - Preparation time expressed as a shared visual scale and tabular figures.
 - Food imagery and plain language balancing the technical timing grammar.
-- Safety and sample-data states visible at the point of choice.
+- Safety, stock and kitchen state remain visible at the point of choice. Stored sample provenance does not imply operator verification.
 
 ## Colors
 
@@ -186,11 +186,11 @@ Controls use gently squared 5–10px corners. The timing rail and basket are com
 
 ### Preparation-Time Rail
 
-A white, fine-bordered scale places aggregated orange meal counts from 1–12 minutes. The rail is a comparison aid, not a guarantee; its accessible label includes the complete count-by-minute distribution.
+A white, fine-bordered scale places aggregated orange menu-item counts at the centre of their 1–12+ minute columns. The rail compares menu preparation estimates, not pickup availability. It starts expanded on desktop and collapsed on phones/tablets so the menu remains reachable; a user's choice survives polling. Its accessible label includes the complete count-by-minute distribution.
 
 ### Meal Register
 
-Desktop meals are rows separated by hairlines, with aligned preparation and price columns. Mobile keeps the image, food-safety tags, allergen note, preparation estimate, price and Add action visible. Sample-menu labels and unknown information are never visually suppressed to make a row cleaner.
+Desktop meals are rows separated by hairlines, with aligned preparation and price columns. Mobile keeps the image, food-safety tags, full allergen note, preparation estimate, price and Add action visible. The user's requested removal of visible sample labels is preserved; unknown dietary information and stored provenance remain intact. Mid-width desktop rows rearrange their preparation and price blocks to leave the meal description readable beside the basket.
 
 ## Do's and Don'ts
 
@@ -199,11 +199,11 @@ Desktop meals are rows separated by hairlines, with aligned preparation and pric
 - **Do** keep preparation figures, locations, prices and dietary states scannable together.
 - **Do** use Warm Paper, Campus Green and Pickup Orange as the recognizable BreakBite world.
 - **Do** keep mobile controls comfortable and basket checkout actions reachable with long orders.
-- **Do** use real food imagery with truthful sample and provenance labels.
+- **Do** retain truthful image provenance in stored metadata and documentation; respect the user's chosen display of those labels.
 
 ### Don't:
 - **Don't** reintroduce a decorative marketing hero above the ordering task.
 - **Don't** turn every result into an isolated rounded card or add shadows without a state purpose.
-- **Don't** hide allergen, unknown or sample-menu states on narrow screens.
+- **Don't** hide or clip allergen warnings and unknown dietary states on narrow screens.
 - **Don't** invent nutrition, certification, availability or waiting-time claims.
 - **Don't** use orange as a broad background treatment; its scarcity makes actions clear.

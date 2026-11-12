@@ -7,8 +7,8 @@ This inventory records what the project currently knows about shipping raster as
 - **Files:** `public/images/menu/*.jpg`
 - **Origin:** AI-generated illustrative samples created for this student project.
 - **Use:** Sample dish imagery only. The images are not photographs of the actual APU meals or proof that a kitchen serves the pictured item.
-- **In-product credit:** Seeded menu records use `AI-generated illustrative sample; actual kitchen item may differ.` as `photoCredit`.
-- **Restrictions:** Keep the menu marked **Sample** until the operator reviews and replaces it. Do not present these images as vendor-supplied photography.
+- **Stored credit:** Seeded menu records use `AI-generated illustrative sample; actual kitchen item may differ.` as `photoCredit`. The visible credit paragraph and sample badges are hidden at the project owner's request.
+- **Restrictions:** Preserve the unreviewed state and provenance until the operator reviews/replaces the data. Hidden labels do not imply verified meals; do not present these images as vendor-supplied photography.
 
 ## Cafeteria photographs
 

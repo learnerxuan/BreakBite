@@ -34,14 +34,16 @@ BreakBite is an independent APU-focused student project, not an official univers
 - Review ingredients, spice levels, dietary declarations, contains/may-contain warnings and evidence references.
 - Use QR or manual pickup codes, counter payment confirmation, notices and recovery tools.
 - Optionally plan around manual, imported or confirmed APSpace timetable gaps.
+- Show a prominent, private estimate of food preparation waiting avoided after collection, without double-counting parallel kitchen preparation.
+- Kitchen workspaces include independent order queues, finished-order history tables, persistent close/reopen controls and consent-based delay recovery.
 
 ## Constraints and boundaries
 
 - No physical-queue measurement or historical demand prediction.
 - No invented nutrition, allergy guarantee, certification or university endorsement.
 - Halal and gluten-free claims require vendor-supplied evidence and review dates.
-- Google Cloud, Firebase and actual Gemini Enterprise execution remain deferred.
-- Local JSON storage is single-process; public deployment and campus-scale performance are not claimed.
+- JSON storage remains single-process; optional shared Firestore storage and Vercel deployment configuration are implemented. Real project credentials and hosted acceptance remain pending.
+- Actual Gemini Enterprise execution and campus-scale performance are not claimed.
 
 ## Brand commitments
 
@@ -53,8 +55,8 @@ BreakBite is an independent APU-focused student project, not an official univers
 ## Evidence on hand
 
 - Tested TypeScript ordering, account, kitchen, QR, dietary and timetable flows.
-- Project-purpose sample menus for eleven kitchens and supplied restaurant photographs.
-- AI-generated illustrative dish images, labelled as samples.
+- Project-purpose menus for nine active kitchens and supplied restaurant photographs. Bowl Lab and Noodle & Co. remain retired; existing order records are preserved.
+- AI-generated illustrative dish images retain stored provenance. Visible sample badges and photo/review paragraphs are hidden at the project owner's request; this does not imply verification.
 - Automated tests and documented localhost browser journeys.
 - No vendor certification, university endorsement, measured waiting-time reduction or verified public deployment.
 
