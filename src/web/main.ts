@@ -130,6 +130,7 @@ async function refresh(): Promise<void> {
     }
     if(s.view==='inbox') await refreshPush(s.actor);
     if(s.vendorFilter!=='all'&&!s.vendors.some(v=>v.id===s.vendorFilter&&v.open&&!v.archived))s.vendorFilter='all';
+    if(s.areaFilter&&!s.vendors.some(v=>v.open&&!v.archived&&v.location===s.areaFilter))s.areaFilter='';
     s.offline=false;
 }
 function authDialog(): string {
@@ -141,7 +142,7 @@ function render(): void {
     const active=document.activeElement as HTMLInputElement|null;
     const focusId=active?.id; const selection=active?.tagName==='INPUT' && ['text','search'].includes(active.type)?active.selectionStart:null;
     const scrollBefore = root.querySelector<HTMLElement>('.bb-basket-scroll');
-    const disclosures = [...root.querySelectorAll<HTMLDetailsElement>('#prep-rail, #savings-explanation')].map(({ id, open }) => ({ id, open }));
+    const disclosures = [...root.querySelectorAll<HTMLDetailsElement>('#prep-rail, #savings-explanation, #allergy-filters')].map(({ id, open }) => ({ id, open }));
     if (scrollBefore && (root.querySelector('#mobile-basket-dialog') || !mobileBasket())) basketScrollTop = scrollBefore.scrollTop;
     if (!mobileBasket() || s.view !== 'explore' || s.auth || s.quote || s.detailItem || s.qr || s.scanner) s.mobileBasketOpen = false;
     const student=s.actor?.role!=='vendor';
@@ -260,6 +261,11 @@ root.addEventListener('click',event=>{
         return;
     }
     if(target.dataset.vendorTab){s.vendorTab=target.dataset.vendorTab as typeof s.vendorTab;render();return;}
+    if(target.hasAttribute('data-area')){const area=target.dataset.area??'';s.areaFilter=s.areaFilter===area?'':area;s.vendorFilter='all';render();return;}
+    if(target.dataset.menuDiet==='vegetarian'||target.dataset.menuDiet==='vegan'){s.menuDiet=s.menuDiet===target.dataset.menuDiet?'all':target.dataset.menuDiet;render();return;}
+    if(target.hasAttribute('data-spicy')){s.spicyOnly=!s.spicyOnly;render();return;}
+    if(target.hasAttribute('data-max-prep')){const value=target.dataset.maxPrep;const minutes=Number(value);if(value==='all')s.maxPrepMinutes=null;else if(Number.isInteger(minutes)&&minutes>=1&&minutes<=11)s.maxPrepMinutes=minutes;render();return;}
+    if(action==='reset-menu-filters'){s.areaFilter='';s.vendorFilter='all';s.category='All';s.search='';s.menuDiet='all';s.spicyOnly=false;s.maxPrepMinutes=null;s.allergenFilters=[];render();return;}
     if(target.dataset.category){s.category=target.dataset.category;render();return;}
     if(target.dataset.allergenFilter){
         const allergen=target.dataset.allergenFilter as typeof s.allergenFilters[number];

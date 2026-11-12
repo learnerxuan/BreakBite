@@ -1,7 +1,9 @@
+import { menuResults, pickupAreas } from '../menu-browse.js';
+import { areaStrip, browseFilters, prepFilter } from './menu-filters.js';
 import { mealPickup } from './kitchen-status.js';
 import { savingsPanel } from './savings.js';
 import { estimatedPreparationSavedMinutes } from '../../shared/savings.js';
-import { ALLERGENS, foodCheck, isClosed, label, type Allergen } from '../../shared/features.js';
+import { foodCheck, isClosed } from '../../shared/features.js';
 import { foodSummary, photo, favouriteStrip, policySummary } from './personal.js';
 import { money, time, atRisk, type Proposal, type PublicOrder } from '../../shared/model.js';
 import type { ViewState } from '../state.js';
@@ -47,32 +49,19 @@ export function basket(s: ViewState): string {
     ${s.cart.length&&s.actor?'<button class="bb-text-button" data-action="save-usual">Save basket as a usual order</button>':''}</div></aside>`;
     return mobileBasket() && s.mobileBasketOpen ? `<dialog id="mobile-basket-dialog" class="bb-mobile-basket" aria-labelledby="basket-title">${content}</dialog>` : content;
 }
-function prepRail(items: ViewState['items']): string {
-    const groups = new Map<number, number>();
-    items.forEach(i => {
-        const minutes = Math.min(12, Math.max(1, i.prepMinutes));
-        groups.set(minutes, (groups.get(minutes) ?? 0) + 1);
-    });
-    const markers = [...groups].map(([minutes, count]) => {
-        return `<span class="bb-time-marker bb-time-at-${minutes}" title="${count} menu item${count===1?'':'s'} · ${minutes}${minutes===12?' or more':''} min" aria-hidden="true"><b>${count}</b></span>`;
-    }).join('');
-    const summary = [...groups].sort(([a],[b])=>a-b).map(([minutes,count])=>`${minutes}${minutes===12?' or more':''} ${minutes===1?'minute':'minutes'}: ${count} meal${count===1?'':'s'}`).join('; ');
-    return `<details id="prep-rail" class="bb-time-rail" ${mobileBasket()?'':'open'}><summary id="prep-rail-toggle" class="bb-time-rail-head"><strong>Compare preparation times</strong><span>${items.length} menu item${items.length===1?'':'s'}</span></summary><div class="bb-time-scale" role="img" aria-label="Preparation-time distribution. ${summary}">${markers}${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<span class="bb-time-tick ${n%2===0&&n!==12?'minor':''}" data-prep-minute="${n}"><i></i>${n}${n===12?'+':''}</span>`).join('')}</div><p>Menu prep estimates, not pickup availability. Counts show items at each estimate; 12+ includes longer preparation.</p></details>`;
-}
 export function explore(s: ViewState): string {
     const activeVendors = s.vendors.filter(v => !v.archived && v.open);
-    const activeIds = new Set(activeVendors.map(v => v.id));
-    const allergyPreferences = { diets: [], avoid: s.allergenFilters, hideUnsuitable: true };
-    const filtered = s.items.filter(i=> activeIds.has(i.vendorId) && (s.vendorFilter==='all'||s.vendorFilter===i.vendorId) && (s.category==='All'||s.category===i.category) && `${i.name} ${i.description} ${activeVendors.find(v=>v.id===i.vendorId)?.name??''}`.toLowerCase().includes(s.search.trim().toLowerCase()) && (!s.allergenFilters.length || foodCheck(i.foodInfo,allergyPreferences).suitable) && (!s.profile.preferences.hideUnsuitable || foodCheck(i.foodInfo,s.profile.preferences).suitable));
-    const allergenName = (a: Allergen): string => label(a).replace(/\b\w/g, c=>c.toUpperCase());
-    const emptyMessage = s.allergenFilters.length ? 'No meals have reviewed information that passes every selected allergy filter. Try clearing a filter or ask the kitchen directly.' : 'Try another category or search.';
-    return `<header class="bb-explore-intro"><div><h1>Find lunch by the minute.</h1><p>Search meals, compare preparation times and order ahead across APU kitchens.</p></div><div class="bb-explore-facts"><span>${activeVendors.length} kitchens open</span><span>Pay at pickup</span><span>Times shown in MYT</span></div></header>
+    const filtered = menuResults(s);
+    const prepItems = menuResults(s, false);
+    const areas = pickupAreas(s.vendors);
+    const emptyMessage = s.allergenFilters.length ? 'No meals have reviewed information that passes every selected allergy filter. Try clearing a filter or ask the kitchen directly.' : s.menuDiet!=='all' ? 'No meals with reviewed information match this diet. Clear the diet filter or ask the kitchen for reviewed details.' : 'Try clearing an area, preparation-time, category or search filter.';
+    return `<header class="bb-explore-intro"><div><h1>Find food for<br>this break.</h1><p>Compare preparation time, campus location and dietary information before you add a meal.</p></div><div class="bb-explore-facts"><span><strong>${areas.length}</strong> pickup areas</span><span><strong>${filtered.length}</strong> menu items shown</span><span><strong>MYT</strong> pickup times</span></div></header>
     ${savingsPanel(s)}
+    <form id="search-form" class="bb-filter-row bb-search-workspace bb-campus-search"><label class="bb-search"><span class="sr-only">Search meals</span>${icon('search')}<input id="search-input" name="search" type="search" placeholder="Search meals or kitchens" value="${esc(s.search)}"></label><label class="bb-kitchen-filter"><span class="sr-only">Kitchen</span><select id="kitchen-filter"><option value="all">All open kitchens</option>${activeVendors.filter(v=>!s.areaFilter||v.location===s.areaFilter).map(v=>`<option value="${esc(v.id)}" ${s.vendorFilter===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select></label><button class="bb-button primary" type="submit">Find meals</button></form>
+    ${areaStrip(s)}
     <div class="bb-page-grid bb-explore-grid"><section class="bb-menu-workspace" aria-label="Campus menu">
-    <form id="search-form" class="bb-filter-row bb-search-workspace"><label class="bb-search"><span class="sr-only">Search meals</span>${icon('search')}<input id="search-input" name="search" type="search" placeholder="Search meals, drinks or kitchens" value="${esc(s.search)}"></label><button class="bb-button primary" type="submit">Search</button><label class="bb-kitchen-filter"><span class="sr-only">Kitchen</span><select id="kitchen-filter"><option value="all">All open kitchens</option>${activeVendors.map(v=>`<option value="${esc(v.id)}" ${s.vendorFilter===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}</select></label></form>
-    <div class="bb-chips" aria-label="Menu categories">${['All','Rice','Noodles','Light bites','Drinks'].map(c=>`<button data-category="${c}" class="${s.category===c?'active':''}" aria-pressed="${s.category===c}">${c}</button>`).join('')}</div>
-    <details class="bb-allergy-filters" ${s.allergenFilters.length?'open':''}><summary><span>${icon('alert')} Allergy filters</span><small>${s.allergenFilters.length?`${s.allergenFilters.length} selected`:'Choose allergens to avoid'}</small></summary><p>Only meals with reviewed ingredient information and no selected “contains” or “may contain” warnings are shown. This is not a guarantee against cross-contact.</p><div class="bb-allergy-options" aria-label="Allergens to avoid">${ALLERGENS.map(a=>`<button type="button" data-allergen-filter="${a}" class="${s.allergenFilters.includes(a)?'active':''}" aria-pressed="${s.allergenFilters.includes(a)}">Avoid ${allergenName(a)}</button>`).join('')}${s.allergenFilters.length?'<button type="button" data-action="clear-allergen-filters" class="clear">Clear all</button>':''}</div></details>
-    ${prepRail(filtered)}
+    ${browseFilters(s)}
+    ${prepFilter(s,prepItems,mobileBasket())}
     ${favouriteStrip(s)}
     <div class="bb-menu-heading"><div><h2>Explore the menu</h2><p>${filtered.length} menu item${filtered.length===1?'':'s'} shown · stock and pickup estimates below</p></div><span>Prep</span><span>Price</span></div>
     <div class="bb-menu-grid bb-meal-register">${filtered.map(i=>{const v=s.vendors.find(v=>v.id===i.vendorId)!;const check=foodCheck(i.foodInfo,s.profile.preferences);const available=v.open&&i.enabled&&i.stock>0&&check.suitable;return `<article class="bb-meal"><div class="bb-meal-art">${photo(i)}<button class="bb-heart ${s.profile.favourites.includes(i.id)?'saved':''}" data-action="favourite" data-id="${esc(i.id)}" aria-label="${s.profile.favourites.includes(i.id)?'Remove favourite':'Favourite'} ${esc(i.name)}" aria-pressed="${s.profile.favourites.includes(i.id)}">${s.profile.favourites.includes(i.id)?'♥':'♡'}</button></div><div class="bb-meal-body"><span class="bb-kitchen-name">${esc(v.name)} · ${esc(v.location)}</span><h3>${esc(i.name)}</h3><p>${esc(i.description)}</p>${foodSummary(i)}<button class="bb-text-button" data-action="food-details" data-id="${esc(i.id)}">Ingredients & dietary details</button>${!check.suitable?`<p class="bb-warning">${esc(check.reasons.join(' '))}</p>`:''}<span class="bb-availability">${!v.open?'Kitchen closed':!i.enabled||i.stock===0?'Currently unavailable':`${i.stock} available`}</span>${mealPickup(s,i)}</div><div class="bb-meal-time"><strong>${i.prepMinutes}</strong><span>min</span></div><div class="bb-card-bottom"><strong>${money(i.priceSen)}</strong><button class="bb-add" data-action="add" data-vendor="${esc(i.vendorId)}" data-id="${esc(i.id)}" ${!available||s.busy?'disabled':''} aria-label="Add ${esc(i.name)}">${available?'+ Add':!check.suitable?'Check diet':'Unavailable'}</button></div></article>`;}).join('') || `<div class="bb-empty"><h3>No meals match.</h3><p>${emptyMessage}</p></div>`}</div>

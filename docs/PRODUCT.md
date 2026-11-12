@@ -28,6 +28,7 @@ BreakBite is an independent APU-focused student project, not an official univers
 ## Current capabilities
 
 - Browse and search campus menus; filter by kitchen, category and declared allergens.
+- Pick a current campus pickup area from supplied counter photos, with open-kitchen counts. Combine area, category, kitchen-reviewed vegetarian/vegan, declared spicy and maximum menu-preparation filters. These browsing controls do not change saved dietary preferences or reserve capacity.
 - Compare preparation estimates, stock and kitchen availability.
 - Mix kitchens in one atomic checkout and choose feasible pickup windows.
 - Save favourites, usual baskets and recent meals for review and repeat ordering.

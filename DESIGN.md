@@ -134,7 +134,7 @@ The palette is small and functional: green establishes trust and structure, oran
 
 ## Layout
 
-The application sits in a centered 1360px frame with 28px desktop gutters. Explore uses a two-column work surface: a flexible menu register and a 330px sticky basket separated by a 24px gap. Search, kitchen selection, categories, allergen filters and the preparation-time rail appear before the meal register.
+The application sits in a centered frame with desktop gutters. A full-width search row leads into three pickup-area photo panels using the supplied kitchen photographs, grouped from current saved locations. Cafeteria, Atrium and Above Centre Point contain six, one and two active kitchens in the initial catalogue. Below this, Explore uses a flexible menu register and a 330px sticky basket separated by a 24px gap. Meal-type, diet/spice and clear allergen controls appear before the optional preparation-time filter. Phones show all three area tiles together and retain fixed basket shortcuts.
 
 Meal rows use four aligned zones: 126px food image, flexible description, 68px preparation figure and 92px price/action. At 1180px these compress; at 860px the basket moves into normal flow. At 600px, search becomes two rows and each meal becomes a compact image/body/action arrangement. Core touch actions are at least 44px high. The mobile basket shortcut stays fixed while basket contents scroll independently from the pinned checkout action.
 
@@ -186,7 +186,11 @@ Controls use gently squared 5–10px corners. The timing rail and basket are com
 
 ### Preparation-Time Rail
 
-A white, fine-bordered scale places aggregated orange menu-item counts at the centre of their 1–12+ minute columns. The rail compares menu preparation estimates, not pickup availability. It starts expanded on desktop and collapsed on phones/tablets so the menu remains reachable; a user's choice survives polling. Its accessible label includes the complete count-by-minute distribution.
+A white, fine-bordered preparation panel offers maximum-estimate buttons for 1–11 minutes and an unbounded 12+/All option. Counts are cumulative within the other current filters. It filters menu estimates, not pickup availability or kitchen workload. It starts expanded on desktop and collapsed on phones/tablets; the user's choice and keyboard focus survive polling. Each button has an explicit accessible maximum and result count.
+
+### Allergy Control
+
+Use a warm orange-tinted background, a strong orange outline, a warning icon, bold “Allergy filters”, an underlined “Choose allergens to avoid” action and a directional chevron. The whole disclosure is clickable and at least 56px high. Selected counts remain visible while collapsed. Expansion and focus survive refresh; unknown or unreviewed information is excluded by active allergy/diet filters. Browse filters do not overwrite saved food preferences.
 
 ### Meal Register
 

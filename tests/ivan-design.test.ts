@@ -43,7 +43,10 @@ test('the optional preparation comparison labels 12-plus honestly and is not a p
     state.items[0]!.prepMinutes = 1; state.items[1]!.prepMinutes = 12; state.items[2]!.prepMinutes = 20;
     const html = explore(state);
     assert.match(html, /<details id="prep-rail"/);
-    assert.match(html, /bb-time-at-12[^>]*title="2 menu items · 12 or more min"/);
-    assert.match(html, /data-prep-minute="12"[^>]*>[\s\S]*?12\+/);
+    assert.match(html, /data-max-prep="all"[^>]*aria-label="Any preparation time · 3 menu items"/);
+    assert.match(html, /<strong>12\+<\/strong>/);
     assert.match(html, /not pickup availability/);
+    state.maxPrepMinutes = 11;
+    assert.equal(html.match(/<article class="bb-meal">/g)?.length, 3);
+    assert.equal(explore(state).match(/<article class="bb-meal">/g)?.length, 1);
 });
